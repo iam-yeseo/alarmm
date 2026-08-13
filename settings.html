@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fafafa" />
+    <meta name="description" content="Alarmm 근무, 점심, 야근 시간을 설정하세요." />
+    <title>Alarmm · Setting</title>
+    <link rel="icon" href="./assets/figma-avatar-circle.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="settings">
+    <div class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="header-kicker">Settings</p>
+          <h1 class="header-title">설정</h1>
+        </div>
+        <a class="profile-link" href="./index.html" aria-label="홈으로 돌아가기">
+          <img src="./assets/figma-avatar-circle.svg" alt="" width="56" height="56" />
+          <span aria-hidden="true">A</span>
+        </a>
+      </header>
+
+      <main class="page-content settings-content">
+        <form id="settingsForm" novalidate>
+          <section class="card settings-card" aria-labelledby="basicSettingsTitle">
+            <div class="section-heading">
+              <span class="section-number">01</span>
+              <div>
+                <h2 id="basicSettingsTitle">기본 설정</h2>
+                <p>평소 출근과 퇴근 시각을 알려주세요.</p>
+              </div>
+            </div>
+
+            <div class="time-field-grid">
+              <label class="field-control">
+                <span>근무 시작</span>
+                <input id="startTime" name="startTime" type="time" required />
+              </label>
+              <label class="field-control">
+                <span>근무 종료</span>
+                <input id="endTime" name="endTime" type="time" required />
+              </label>
+            </div>
+            <p class="field-note" id="workDurationNote">총 근무 시간을 계산하고 있어요.</p>
+          </section>
+
+          <section class="card settings-card" aria-labelledby="lunchSettingsTitle">
+            <div class="section-heading with-switch">
+              <span class="section-number">02</span>
+              <div>
+                <h2 id="lunchSettingsTitle">점심시간</h2>
+                <p>점심시간에는 진행률이 잠시 멈춰요.</p>
+              </div>
+              <label class="switch">
+                <input id="lunchEnabled" name="lunchEnabled" type="checkbox" />
+                <span aria-hidden="true"></span>
+                <span class="sr-only">점심시간 사용</span>
+              </label>
+            </div>
+
+            <div class="setting-group" id="lunchFields">
+              <div class="time-field-grid">
+                <label class="field-control">
+                  <span>점심 시작</span>
+                  <input id="lunchStart" name="lunchStart" type="time" />
+                </label>
+                <label class="field-control">
+                  <span>점심 종료</span>
+                  <input id="lunchEnd" name="lunchEnd" type="time" />
+                </label>
+              </div>
+              <label class="field-control duration-control">
+                <span>점심시간</span>
+                <span class="number-field">
+                  <input
+                    id="lunchMinutes"
+                    name="lunchMinutes"
+                    type="number"
+                    min="0"
+                    max="240"
+                    step="5"
+                    inputmode="numeric"
+                  />
+                  <em>분</em>
+                </span>
+              </label>
+              <p class="field-note" id="lunchDurationNote">설정한 구간과 분 단위를 함께 맞춰드려요.</p>
+            </div>
+          </section>
+
+          <section class="card settings-card" aria-labelledby="overtimeSettingsTitle">
+            <div class="section-heading with-switch">
+              <span class="section-number">03</span>
+              <div>
+                <h2 id="overtimeSettingsTitle">야근 설정</h2>
+                <p>오늘 야근한다면 실제 퇴근 예정 시각을 써주세요.</p>
+              </div>
+              <label class="switch">
+                <input id="overtimeEnabled" name="overtimeEnabled" type="checkbox" />
+                <span aria-hidden="true"></span>
+                <span class="sr-only">야근 사용</span>
+              </label>
+            </div>
+
+            <div class="setting-group" id="overtimeFields">
+              <label class="field-control">
+                <span>야근 종료 예정</span>
+                <input id="overtimeEndTime" name="overtimeEndTime" type="time" />
+              </label>
+              <label class="check-row">
+                <input id="includeOvertimeInProgress" name="includeOvertimeInProgress" type="checkbox" />
+                <span>
+                  <strong>오늘 진행률에 야근 포함</strong>
+                  <small>켜면 홈의 100% 기준이 야근 종료 시각으로 바뀌어요.</small>
+                </span>
+              </label>
+              <p class="field-note accent-note" id="overtimeDurationNote">야근을 사용하지 않아요.</p>
+            </div>
+          </section>
+
+          <section class="card summary-card" aria-labelledby="summaryTitle">
+            <div>
+              <p class="summary-kicker">오늘의 시간표</p>
+              <h2 id="summaryTitle">09:00 — 18:00</h2>
+              <p id="summaryDescription">점심 60분을 제외하고 8시간 근무해요.</p>
+            </div>
+            <div class="summary-chip" id="summaryChip">정시 퇴근</div>
+          </section>
+
+          <p class="form-error" id="formError" role="alert"></p>
+          <button class="save-button" type="submit">설정 저장하기</button>
+          <p class="save-caption">저장한 설정은 이 브라우저에 안전하게 보관됩니다.</p>
+        </form>
+      </main>
+
+      <nav class="bottom-nav" aria-label="주요 메뉴">
+        <a class="nav-item" href="./index.html">
+          <span class="nav-dot" aria-hidden="true"></span>
+          <span>Home</span>
+        </a>
+        <a class="nav-item active" href="./settings.html" aria-current="page">
+          <span class="nav-dot" aria-hidden="true"></span>
+          <span>Setting</span>
+        </a>
+      </nav>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js" defer></script>
+  </body>
+</html>
