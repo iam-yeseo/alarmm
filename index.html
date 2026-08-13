@@ -42,7 +42,9 @@
             </span>
           </button>
 
-          <button class="work-state" id="workStateButton" type="button" disabled>시간 계산 중</button>
+          <button class="work-state" id="workStateButton" type="button" disabled>
+            <span class="work-state-label" id="workStateLabel">시간 계산 중</span>
+          </button>
           <p class="interaction-hint">시간을 누르면 보기 방식을 바꿀 수 있어요.</p>
         </section>
 
@@ -119,6 +121,21 @@
           <span>Setting</span>
         </a>
       </nav>
+    </div>
+
+    <div class="dialog-backdrop" id="attendanceDialog" hidden>
+      <section
+        class="attendance-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="attendanceDialogMessage"
+      >
+        <p id="attendanceDialogMessage"></p>
+        <div class="dialog-actions">
+          <button class="dialog-button secondary" id="attendanceDialogCancel" type="button">취소</button>
+          <button class="dialog-button primary" id="attendanceDialogConfirm" type="button">확인</button>
+        </div>
+      </section>
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

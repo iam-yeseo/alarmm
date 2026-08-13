@@ -339,6 +339,7 @@ ol {
 }
 
 .work-state {
+  position: relative;
   display: flex;
   width: 100%;
   height: 56px;
@@ -349,6 +350,42 @@ ol {
   background: #efefef;
   font-size: 18px;
   font-weight: 500;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.work-state-label {
+  transition: opacity 120ms ease;
+}
+
+.work-state[data-action="clock-in"],
+.work-state[data-action="checkout"] {
+  cursor: pointer;
+}
+
+.work-state[data-action="clock-in"] {
+  color: #ffffff;
+  background: var(--pink);
+}
+
+.work-state[data-action="clock-in"]:active,
+.work-state[data-action="checkout"]:active {
+  transform: scale(0.985);
+}
+
+.work-state[data-action="checkout"]::after {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  color: #ffffff;
+  content: "퇴근하기";
+  opacity: 0;
+  transition: opacity 120ms ease;
 }
 
 .work-state.complete {
@@ -364,6 +401,20 @@ ol {
 
 .work-state:disabled {
   opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .work-state[data-action="checkout"]:hover {
+    background: var(--pink);
+  }
+
+  .work-state[data-action="checkout"]:hover .work-state-label {
+    opacity: 0;
+  }
+
+  .work-state[data-action="checkout"]:hover::after {
+    opacity: 1;
+  }
 }
 
 .interaction-hint {
@@ -922,6 +973,78 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   color: var(--muted);
   font-size: 11px;
   text-align: center;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  z-index: 90;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(34, 34, 34, 0.34);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.dialog-backdrop[hidden] {
+  display: none;
+}
+
+.attendance-dialog {
+  width: min(100%, 344px);
+  padding: 24px 20px 20px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(34, 34, 34, 0.2);
+}
+
+.attendance-dialog p {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.55;
+  letter-spacing: -0.03em;
+  text-align: center;
+}
+
+.dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.dialog-actions.single-action {
+  grid-template-columns: 1fr;
+}
+
+.dialog-button {
+  min-height: 48px;
+  border-radius: 13px;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.dialog-button.secondary {
+  color: var(--muted);
+  background: #efefef;
+}
+
+.dialog-button.primary {
+  color: #ffffff;
+  background: var(--pink);
+}
+
+.dialog-button:active {
+  transform: scale(0.98);
+}
+
+.dialog-button:focus-visible {
+  outline: 3px solid rgba(242, 116, 144, 0.28);
+  outline-offset: 2px;
 }
 
 .toast {

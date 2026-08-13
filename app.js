@@ -3,7 +3,7 @@
 
   var SETTINGS_KEY = "alarmm-settings-v1";
   var HISTORY_KEY = "alarmm-history-v1";
-  var DAY_MS = 24 * 60 * 60 * 1000;
+  var ATTENDANCE_KEY = "alarmm-attendance-v1";
   var MINUTE_MS = 60 * 1000;
 
   var defaultSettings = {
@@ -47,6 +47,11 @@
   function loadHistory() {
     var history = loadJson(HISTORY_KEY, []);
     return Array.isArray(history) ? history : [];
+  }
+
+  function loadAttendance() {
+    var attendance = loadJson(ATTENDANCE_KEY, {});
+    return attendance && typeof attendance === "object" ? attendance : {};
   }
 
   function parseTime(value) {
@@ -203,8 +208,25 @@
   function initHome() {
     var settings = loadSettings();
     var history = loadHistory();
+    var attendance = loadAttendance();
     var showRemainingAsMain = false;
     var lastCalendarDay = "";
+    var dialogConfirmAction = null;
+
+    function closeAttendanceDialog() {
+      $("attendanceDialog").hidden = true;
+      dialogConfirmAction = null;
+      $("workStateButton").focus();
+    }
+
+    function openAttendanceDialog(message, alertOnly, onConfirm) {
+      $("attendanceDialogMessage").textContent = message;
+      $("attendanceDialogCancel").hidden = alertOnly;
+      $("attendanceDialog").querySelector(".dialog-actions").classList.toggle("single-action", alertOnly);
+      dialogConfirmAction = onConfirm;
+      $("attendanceDialog").hidden = false;
+      $("attendanceDialogConfirm").focus();
+    }
 
     function renderCalendar(now) {
       var todayId = localDateId(now);
@@ -311,35 +333,41 @@
       renderWorkState(state, schedule);
     }
 
+    function setWorkButton(button, label, action, className) {
+      $("workStateLabel").textContent = label;
+      button.dataset.action = action || "";
+      button.classList.remove("complete", "overtime", "check-in");
+      if (className) button.classList.add(className);
+      button.disabled = !action;
+      button.setAttribute("aria-label", action === "checkout" ? "퇴근하기" : label);
+    }
+
+    function getTodayAttendance() {
+      return attendance[localDateId(new Date())] || null;
+    }
+
     function renderWorkState(state, schedule) {
       var button = $("workStateButton");
       var saveButton = $("saveTodayButton");
       var recorded = history.some(function (item) {
         return item.date === localDateId(new Date());
       });
+      var todayAttendance = getTodayAttendance();
 
-      button.classList.remove("complete", "overtime");
-      button.disabled = true;
       saveButton.hidden = true;
 
       if (state === "weekend") {
-        button.textContent = "오늘은 쉬어가는 날";
-      } else if (state === "before") {
-        button.textContent = settings.startTime + " 출근 예정";
-      } else if (state === "lunch") {
-        button.textContent = "점심시간 · " + settings.lunchEnd + " 복귀";
-      } else if (state === "working") {
-        button.textContent = "근무 중";
-      } else if (state === "overtime") {
-        button.textContent = "야근 중 · " + settings.overtimeEndTime + " 종료";
-        button.classList.add("overtime");
+        setWorkButton(button, "오늘은 쉬어가는 날", "", "");
+      } else if (todayAttendance && todayAttendance.clockOutAt) {
+        setWorkButton(button, "퇴근 완료", "", "complete");
       } else if (recorded) {
-        button.textContent = "오늘 근무기록 저장 완료";
-        button.classList.add("complete");
+        setWorkButton(button, "오늘 근무기록 저장 완료", "", "complete");
+      } else if (!todayAttendance || !todayAttendance.clockInAt) {
+        setWorkButton(button, "출근하기", "clock-in", "check-in");
+      } else if (state === "overtime") {
+        setWorkButton(button, "야근 중 · " + settings.overtimeEndTime + " 종료", "checkout", "overtime");
       } else {
-        button.textContent = "오늘 근무 완료";
-        button.classList.add("complete");
-        saveButton.hidden = false;
+        setWorkButton(button, "근무 중", "checkout", "");
       }
 
       button.dataset.minutes = Math.round(
@@ -351,6 +379,77 @@
           schedule.lunchEnabled
         ) / MINUTE_MS
       );
+    }
+
+    function saveAttendance() {
+      saveJson(ATTENDANCE_KEY, attendance);
+    }
+
+    function clockIn() {
+      var now = new Date();
+      var schedule = getSchedule(now, settings);
+      var isLate = now > schedule.start;
+
+      openAttendanceDialog(
+        isLate ? "지각입니다. 빨리 출근하세요." : "출근하시겠습니까?",
+        isLate,
+        function () {
+          var confirmedAt = new Date();
+          attendance[localDateId(confirmedAt)] = {
+            date: localDateId(confirmedAt),
+            clockInAt: confirmedAt.toISOString(),
+            clockOutAt: null,
+            late: isLate
+          };
+          saveAttendance();
+          renderClock();
+          showToast(isLate ? "지각 출근으로 기록했어요." : "출근을 기록했어요.");
+        }
+      );
+    }
+
+    function clockOut() {
+      var now = new Date();
+      var schedule = getSchedule(now, settings);
+      var prompt =
+        now < schedule.countdownEnd
+          ? "아직 퇴근 시간이 경과하지 않았습니다. 정말 퇴근하시겠습니까?"
+          : "퇴근하시겠습니까?";
+      var today = localDateId(now);
+      var record = attendance[today];
+      if (!record || !record.clockInAt) return;
+
+      openAttendanceDialog(prompt, false, function () {
+        var confirmedAt = new Date();
+        record.clockOutAt = confirmedAt.toISOString();
+        var actualStart = Math.max(new Date(record.clockInAt).getTime(), schedule.start.getTime());
+        var minutes = Math.round(
+          activeDurationMs(
+            actualStart,
+            confirmedAt.getTime(),
+            schedule.lunchStart.getTime(),
+            schedule.lunchEnd.getTime(),
+            schedule.lunchEnabled
+          ) / MINUTE_MS
+        );
+
+        record.minutes = Math.max(0, minutes);
+        saveAttendance();
+
+        var existingHistory = history.find(function (item) {
+          return item.date === today;
+        });
+        if (existingHistory) {
+          existingHistory.minutes = record.minutes;
+          existingHistory.savedAt = confirmedAt.toISOString();
+        } else {
+          history.push({ date: today, minutes: record.minutes, savedAt: confirmedAt.toISOString() });
+        }
+        saveJson(HISTORY_KEY, history);
+        renderHistory();
+        renderClock();
+        showToast("퇴근을 기록했어요.");
+      });
     }
 
     function renderHistory() {
@@ -439,6 +538,29 @@
       renderClock();
     });
 
+    $("workStateButton").addEventListener("click", function () {
+      var action = this.dataset.action;
+      if (action === "clock-in") clockIn();
+      if (action === "checkout") clockOut();
+    });
+
+    $("attendanceDialogCancel").addEventListener("click", closeAttendanceDialog);
+    $("attendanceDialogConfirm").addEventListener("click", function () {
+      var action = dialogConfirmAction;
+      closeAttendanceDialog();
+      if (action) action();
+    });
+    $("attendanceDialog").addEventListener("click", function (event) {
+      if (event.target === this && !$("attendanceDialogCancel").hidden) {
+        closeAttendanceDialog();
+      }
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !$("attendanceDialog").hidden && !$("attendanceDialogCancel").hidden) {
+        closeAttendanceDialog();
+      }
+    });
+
     $("saveTodayButton").addEventListener("click", function () {
       var today = localDateId(new Date());
       if (history.some(function (item) { return item.date === today; })) {
@@ -469,6 +591,7 @@
       if (!document.hidden) {
         settings = loadSettings();
         history = loadHistory();
+        attendance = loadAttendance();
         renderHistory();
         renderClock();
       }
