@@ -14,15 +14,16 @@ python3 -m http.server 4173
 
 ## 구성
 
-- `index.html`: 실시간 시계, 퇴근 카운트다운, 진행률, 근무기록
-- `vacation.html`: 연차·월차 잔여, 반차·반반차·비차감 휴가 신청 내역
-- `settings.html`: 근무 시작/종료, 점심시간, 야근, 입사일과 당겨쓰기 설정
-- `styles.css`: Figma 기반 440px 모바일 캔버스 스타일
+- `index.html`: 실시간 시계, 퇴근 카운트다운, 진행률, 버스 미리보기, 최근 근무기록
+- `calendar.html`: 월간 출근 달력, 누적 근무시간과 월별 기록
+- `vacation.html`: 날짜 범위형 연차·월차, 반차·반반차·비차감 휴가 신청 내역
+- `settings.html`: 근무·휴식·야근, 입사일·생일과 휴가 정책 설정
+- `styles.css`, `styles-v2.css`: Figma 기반 440px 모바일 캔버스와 화면별 스타일
 - `app.js`: 시간 계산, 설정 저장, 근무기록과 휴가 신청 로직
 - `vacation-core.js`: 입사일 기준 휴가 발생·소멸·차감 계산
 - `assets/`: Figma에서 내려받은 원본 SVG 리소스
 
-설정, 근무기록과 휴가 신청은 브라우저 `localStorage`에 저장됩니다.
+설정, 근무기록과 휴가 신청은 브라우저 `localStorage`에 저장됩니다. 생일을 설정하면 해당 날짜의 오후 반차 일정이 자동 반영됩니다.
 
 ## 검사
 
