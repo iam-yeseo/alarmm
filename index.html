@@ -30,6 +30,14 @@
           <ol id="weekCalendar" class="week-list"></ol>
         </section>
 
+        <a class="today-vacation-banner" id="todayVacationBanner" href="./vacation.html" hidden>
+          <span>
+            <small>오늘의 휴가</small>
+            <strong id="todayVacationTitle">휴가 사용일</strong>
+          </span>
+          <em id="todayVacationSchedule">출퇴근 일정 확인</em>
+        </a>
+
         <section class="card clock-card" aria-labelledby="clockLabel">
           <button class="clock-toggle" id="clockToggle" type="button">
             <span class="arc-gauge" aria-hidden="true">
@@ -120,6 +128,10 @@
           <span class="nav-dot" aria-hidden="true"></span>
           <span>Setting</span>
         </a>
+        <a class="nav-item" href="./vacation.html">
+          <span class="nav-dot" aria-hidden="true"></span>
+          <span>Vacation</span>
+        </a>
       </nav>
     </div>
 
@@ -139,6 +151,7 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./vacation-core.js" defer></script>
     <script src="./app.js" defer></script>
   </body>
 </html>

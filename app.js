@@ -4,7 +4,11 @@
   var SETTINGS_KEY = "alarmm-settings-v1";
   var HISTORY_KEY = "alarmm-history-v1";
   var ATTENDANCE_KEY = "alarmm-attendance-v1";
+  var VACATION_KEY = "alarmm-vacations-v1";
   var MINUTE_MS = 60 * 1000;
+  var core = window.AlarmmCore;
+
+  if (!core) throw new Error("AlarmmCore를 불러오지 못했습니다.");
 
   var defaultSettings = {
     startTime: "09:00",
@@ -15,7 +19,9 @@
     lunchMinutes: 60,
     overtimeEnabled: false,
     overtimeEndTime: "20:00",
-    includeOvertimeInProgress: true
+    includeOvertimeInProgress: true,
+    hireDate: "",
+    allowVacationAdvance: false
   };
 
   var $ = function (id) {
@@ -54,6 +60,11 @@
     return attendance && typeof attendance === "object" ? attendance : {};
   }
 
+  function loadVacations() {
+    var vacations = loadJson(VACATION_KEY, []);
+    return Array.isArray(vacations) ? vacations : [];
+  }
+
   function parseTime(value) {
     if (!/^\d{2}:\d{2}$/.test(value || "")) return 0;
     var parts = value.split(":");
@@ -67,6 +78,10 @@
   function formatTimeFromMinutes(totalMinutes) {
     var normalized = ((Math.round(totalMinutes) % 1440) + 1440) % 1440;
     return pad(Math.floor(normalized / 60)) + ":" + pad(normalized % 60);
+  }
+
+  function formatTimeFromDate(date) {
+    return pad(date.getHours()) + ":" + pad(date.getMinutes());
   }
 
   function offsetAfterStart(time, startTime) {
@@ -91,7 +106,49 @@
     return Math.max(0, duration - overlapMs(start, end, lunchStart, lunchEnd));
   }
 
-  function getSchedule(baseDate, settings) {
+  function isFullDayVacation(vacation) {
+    return Boolean(
+      vacation && ["full", "health", "bereavement"].indexOf(vacation.type) !== -1
+    );
+  }
+
+  function workSegments(schedule) {
+    if (!schedule.lunchEnabled) return [[schedule.start, schedule.normalEnd]];
+    return [
+      [schedule.start, new Date(Math.min(schedule.normalEnd, schedule.lunchStart))],
+      [new Date(Math.max(schedule.start, schedule.lunchEnd)), schedule.normalEnd]
+    ].filter(function (segment) {
+      return segment[1] > segment[0];
+    });
+  }
+
+  function advanceActiveTime(schedule, milliseconds) {
+    var remaining = milliseconds;
+    var segments = workSegments(schedule);
+    for (var index = 0; index < segments.length; index += 1) {
+      var segmentLength = segments[index][1] - segments[index][0];
+      if (remaining <= segmentLength) {
+        return new Date(segments[index][0].getTime() + remaining);
+      }
+      remaining -= segmentLength;
+    }
+    return new Date(schedule.normalEnd);
+  }
+
+  function retreatActiveTime(schedule, milliseconds) {
+    var remaining = milliseconds;
+    var segments = workSegments(schedule).reverse();
+    for (var index = 0; index < segments.length; index += 1) {
+      var segmentLength = segments[index][1] - segments[index][0];
+      if (remaining <= segmentLength) {
+        return new Date(segments[index][1].getTime() - remaining);
+      }
+      remaining -= segmentLength;
+    }
+    return new Date(schedule.start);
+  }
+
+  function getSchedule(baseDate, settings, vacation) {
     var normalEndOffset = offsetAfterStart(settings.endTime, settings.startTime);
     if (normalEndOffset === 0) normalEndOffset = 1440;
 
@@ -115,7 +172,7 @@
     var lunchStart = dateAtOffset(baseDate, settings.startTime, lunchStartOffset);
     var lunchEnd = dateAtOffset(baseDate, settings.startTime, lunchEndOffset);
 
-    return {
+    var schedule = {
       start: start,
       normalEnd: normalEnd,
       countdownEnd: countdownEnd,
@@ -127,8 +184,43 @@
       progressEndOffset: progressEndOffset,
       lunchStartOffset: lunchStartOffset,
       lunchEndOffset: lunchEndOffset,
-      lunchEnabled: settings.lunchEnabled
+      lunchEnabled: settings.lunchEnabled,
+      isFullLeave: isFullDayVacation(vacation),
+      vacation: vacation || null
     };
+
+    var vacationUnits = core.getVacationUnits(vacation);
+    if (vacationUnits > 0 && vacationUnits < 1) {
+      var regularDuration = activeDurationMs(
+        schedule.start,
+        schedule.normalEnd,
+        schedule.lunchStart,
+        schedule.lunchEnd,
+        schedule.lunchEnabled
+      );
+      var leaveDuration = regularDuration * vacationUnits;
+
+      if (vacation.period === "pm") {
+        var adjustedEnd = retreatActiveTime(schedule, leaveDuration);
+        schedule.normalEnd = adjustedEnd;
+        schedule.countdownEnd = adjustedEnd;
+        schedule.progressEnd = adjustedEnd;
+      } else {
+        schedule.start = advanceActiveTime(schedule, leaveDuration);
+      }
+    }
+
+    schedule.lunchEnabled = Boolean(
+      settings.lunchEnabled &&
+        schedule.lunchStart < schedule.countdownEnd &&
+        schedule.lunchEnd > schedule.start
+    );
+    schedule.normalEndOffset = Math.max(0, (schedule.normalEnd - schedule.start) / MINUTE_MS);
+    schedule.countdownEndOffset = Math.max(0, (schedule.countdownEnd - schedule.start) / MINUTE_MS);
+    schedule.progressEndOffset = Math.max(0, (schedule.progressEnd - schedule.start) / MINUTE_MS);
+    schedule.lunchStartOffset = (schedule.lunchStart - schedule.start) / MINUTE_MS;
+    schedule.lunchEndOffset = (schedule.lunchEnd - schedule.start) / MINUTE_MS;
+    return schedule;
   }
 
   function getProgress(now, schedule) {
@@ -177,18 +269,84 @@
     return hours + "시간 " + rest + "분";
   }
 
+  function formatUnits(value) {
+    return String(core.roundUnits(value));
+  }
+
   function localDateId(date) {
-    return [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join("-");
+    return core.localDateId(date);
+  }
+
+  function dateIdBefore(dateId) {
+    var date = core.parseDateId(dateId);
+    if (!date) return "";
+    date.setDate(date.getDate() - 1);
+    return localDateId(date);
+  }
+
+  function formatDateShort(dateId) {
+    var date = core.parseDateId(dateId);
+    if (!date) return "—";
+    return date.getFullYear() + "." + pad(date.getMonth() + 1) + "." + pad(date.getDate());
+  }
+
+  function formatDateLong(dateId) {
+    var date = core.parseDateId(dateId);
+    if (!date) return "";
+    var weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+    return (
+      date.getFullYear() +
+      "년 " +
+      (date.getMonth() + 1) +
+      "월 " +
+      date.getDate() +
+      "일 (" +
+      weekdays[date.getDay()] +
+      ")"
+    );
   }
 
   function isWeekend(date) {
     return date.getDay() === 0 || date.getDay() === 6;
   }
 
-  function nextWeekdayStart(now, startTime) {
+  function findVacation(vacations, dateId) {
+    return vacations.find(function (vacation) {
+      return vacation.date === dateId;
+    }) || null;
+  }
+
+  function getVacationLabel(vacation, settings) {
+    if (!vacation) return "";
+    var entitlement = core.getEntitlement(settings.hireDate, vacation.date);
+    var annualLabel = entitlement.eligible ? entitlement.label : "연차";
+    if (vacation.type === "full") return annualLabel + " 1일";
+    if (vacation.type === "half") return (vacation.period === "pm" ? "오후" : "오전") + " 반차";
+    if (vacation.type === "quarter") {
+      return (vacation.period === "pm" ? "오후" : "오전") + " 반반차";
+    }
+    if (vacation.type === "health") return "보건 휴가";
+    if (vacation.type === "bereavement") return "경조사 휴가";
+    return "휴가";
+  }
+
+  function getVacationScheduleText(vacation, settings) {
+    if (!vacation) return "";
+    if (isFullDayVacation(vacation)) return "출퇴근 기록 없음";
+    var baseDate = core.parseDateId(vacation.date) || new Date();
+    var schedule = getSchedule(baseDate, settings, vacation);
+    return formatTimeFromDate(schedule.start) + " 출근 · " + formatTimeFromDate(schedule.countdownEnd) + " 퇴근";
+  }
+
+  function nextWeekdayStart(now, startTime, vacations) {
     var candidate = new Date(now);
     candidate.setDate(candidate.getDate() + 1);
-    while (isWeekend(candidate)) candidate.setDate(candidate.getDate() + 1);
+    while (
+      isWeekend(candidate) ||
+      isFullDayVacation(findVacation(vacations || [], localDateId(candidate)))
+    ) {
+      candidate.setDate(candidate.getDate() + 1);
+    }
     var minutes = parseTime(startTime);
     candidate.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
     return candidate;
@@ -209,8 +367,9 @@
     var settings = loadSettings();
     var history = loadHistory();
     var attendance = loadAttendance();
+    var vacations = loadVacations();
     var showRemainingAsMain = false;
-    var lastCalendarDay = "";
+    var lastCalendarSignature = "";
     var dialogConfirmAction = null;
 
     function closeAttendanceDialog() {
@@ -230,20 +389,46 @@
 
     function renderCalendar(now) {
       var todayId = localDateId(now);
-      if (lastCalendarDay === todayId) return;
-      lastCalendarDay = todayId;
+      var signature = [
+        todayId,
+        Object.keys(attendance).sort().join(","),
+        history.map(function (item) { return item.date; }).sort().join(","),
+        vacations.map(function (item) { return item.date + item.type; }).sort().join(",")
+      ].join("|");
+      if (lastCalendarSignature === signature) return;
+      lastCalendarSignature = signature;
 
       var weekdays = ["일", "월", "화", "수", "목", "금", "토"];
       var calendar = $("weekCalendar");
+      var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       calendar.innerHTML = "";
 
       for (var index = -3; index <= 3; index += 1) {
-        var date = new Date(now);
-        date.setDate(now.getDate() + index);
+        var date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + index);
+        var dateId = localDateId(date);
+        var vacation = findVacation(vacations, dateId);
+        var hasAttendance = Boolean(attendance[dateId] && attendance[dateId].clockInAt) || history.some(function (item) {
+          return item.date === dateId;
+        });
+        var isPast = date < todayStart;
+        var scheduledOff = isWeekend(date) || isFullDayVacation(vacation);
+        var isOutline = (isPast && !hasAttendance) || (!isPast && scheduledOff);
+        var status = hasAttendance
+          ? "출근 기록 있음"
+          : isPast
+            ? "출근 기록 없음"
+            : scheduledOff
+              ? vacation ? getVacationLabel(vacation, settings) : "출근하지 않는 날"
+              : "근무 예정";
         var item = document.createElement("li");
         item.className = "week-day";
         if (index === 0) item.classList.add("today");
-        if (isWeekend(date)) item.classList.add("weekend");
+        if (isOutline) item.classList.add("no-attendance");
+        if (vacation) item.classList.add("vacation-date");
+        item.setAttribute(
+          "aria-label",
+          (date.getMonth() + 1) + "월 " + date.getDate() + "일 " + weekdays[date.getDay()] + "요일, " + status
+        );
 
         var weekday = document.createElement("small");
         weekday.textContent = weekdays[date.getDay()];
@@ -257,6 +442,7 @@
     }
 
     function getDayState(now, schedule) {
+      if (schedule.isFullLeave) return "vacation";
       if (isWeekend(now)) return "weekend";
       if (now < schedule.start) return "before";
       if (
@@ -272,7 +458,7 @@
     }
 
     function getRemainingTarget(now, schedule, state) {
-      if (state === "weekend") return nextWeekdayStart(now, settings.startTime);
+      if (state === "weekend") return nextWeekdayStart(now, settings.startTime, vacations);
       if (state === "before") return schedule.start;
       if (state === "lunch") return schedule.lunchEnd;
       return schedule.countdownEnd;
@@ -291,27 +477,44 @@
 
     function renderClock() {
       var now = new Date();
-      var schedule = getSchedule(now, settings);
+      var vacation = findVacation(vacations, localDateId(now));
+      var schedule = getSchedule(now, settings, vacation);
       var state = getDayState(now, schedule);
-      var progress = state === "weekend" ? 0 : getProgress(now, schedule);
-      var timelineProgress = state === "weekend" ? 0 : getTimelineProgress(now, schedule);
-      var target = getRemainingTarget(now, schedule, state);
-      var remaining = state === "complete" ? "00:00:00" : formatRemaining(target - now);
-      var remainingLabel = getRemainingLabel(state);
+      var isLeaveDay = state === "vacation";
+      var progress = isLeaveDay ? 1 : state === "weekend" ? 0 : getProgress(now, schedule);
+      var timelineProgress = isLeaveDay ? 1 : state === "weekend" ? 0 : getTimelineProgress(now, schedule);
 
-      if (showRemainingAsMain) {
-        $("clockLabel").textContent = remainingLabel;
-        $("clockTime").textContent = remaining;
-        $("clockSecondary").textContent = "현재 시각  |  " + formatClock(now);
+      $("todayVacationBanner").hidden = !vacation;
+      if (vacation) {
+        $("todayVacationTitle").textContent = getVacationLabel(vacation, settings);
+        $("todayVacationSchedule").textContent = getVacationScheduleText(vacation, settings);
+      }
+
+      if (isLeaveDay) {
+        $("clockLabel").textContent = "오늘은 " + getVacationLabel(vacation, settings);
+        $("clockTime").textContent = showRemainingAsMain ? "휴가" : formatClock(now);
+        $("clockSecondary").textContent = showRemainingAsMain
+          ? "현재 시각  |  " + formatClock(now)
+          : "출퇴근 기록 없이 쉬는 날이에요.";
       } else {
-        $("clockLabel").textContent = "현재 시각";
-        $("clockTime").textContent = formatClock(now);
-        $("clockSecondary").textContent = remainingLabel + "  |  " + remaining;
+        var target = getRemainingTarget(now, schedule, state);
+        var remaining = state === "complete" ? "00:00:00" : formatRemaining(target - now);
+        var remainingLabel = getRemainingLabel(state);
+        if (showRemainingAsMain) {
+          $("clockLabel").textContent = remainingLabel;
+          $("clockTime").textContent = remaining;
+          $("clockSecondary").textContent = "현재 시각  |  " + formatClock(now);
+        } else {
+          $("clockLabel").textContent = "현재 시각";
+          $("clockTime").textContent = formatClock(now);
+          $("clockSecondary").textContent = remainingLabel + "  |  " + remaining;
+        }
       }
 
       var percent = Math.round(progress * 100);
       $("arcDial").style.setProperty("--gauge-progress", progress * 180 + "deg");
-      $("progressPercent").textContent = percent + "%";
+      $("progressTitle").textContent = isLeaveDay ? "오늘은 " + getVacationLabel(vacation, settings) : "오늘 진행률";
+      $("progressPercent").textContent = isLeaveDay ? "휴가" : percent + "%";
       $("timelineFill").style.width = timelineProgress * 100 + "%";
 
       var totalOffset = Math.max(1, schedule.countdownEndOffset);
@@ -320,23 +523,22 @@
       $("lunchEndMarker").style.left =
         Math.min(100, Math.max(0, (schedule.lunchEndOffset / totalOffset) * 100)) + "%";
 
-      $("timelineStart").textContent = settings.startTime;
-      $("timelineEnd").textContent = settings.overtimeEnabled
-        ? settings.overtimeEndTime
-        : settings.endTime;
-      $("timelineEndLabel").textContent = settings.overtimeEnabled ? "야근 종료" : "퇴근";
+      $("timelineStart").textContent = isLeaveDay ? "없음" : formatTimeFromDate(schedule.start);
+      $("timelineEnd").textContent = isLeaveDay ? "없음" : formatTimeFromDate(schedule.countdownEnd);
+      $("timelineEndLabel").textContent = settings.overtimeEnabled && !vacation ? "야근 종료" : "퇴근";
       $("timelineLunch").textContent = settings.lunchStart + "–" + settings.lunchEnd;
-      $("timelineLunchWrap").hidden = !settings.lunchEnabled;
-      $("lunchStartMarker").hidden = !settings.lunchEnabled;
-      $("lunchEndMarker").hidden = !settings.lunchEnabled;
+      $("timelineLunchWrap").hidden = isLeaveDay || !schedule.lunchEnabled;
+      $("lunchStartMarker").hidden = isLeaveDay || !schedule.lunchEnabled;
+      $("lunchEndMarker").hidden = isLeaveDay || !schedule.lunchEnabled;
 
-      renderWorkState(state, schedule);
+      if (vacation) $("attendanceMessage").textContent = "오늘은 " + getVacationLabel(vacation, settings) + " 사용일이에요.";
+      renderWorkState(state, schedule, vacation);
     }
 
     function setWorkButton(button, label, action, className) {
       $("workStateLabel").textContent = label;
       button.dataset.action = action || "";
-      button.classList.remove("complete", "overtime", "check-in");
+      button.classList.remove("complete", "overtime", "check-in", "leave");
       if (className) button.classList.add(className);
       button.disabled = !action;
       button.setAttribute("aria-label", action === "checkout" ? "퇴근하기" : label);
@@ -346,7 +548,7 @@
       return attendance[localDateId(new Date())] || null;
     }
 
-    function renderWorkState(state, schedule) {
+    function renderWorkState(state, schedule, vacation) {
       var button = $("workStateButton");
       var saveButton = $("saveTodayButton");
       var recorded = history.some(function (item) {
@@ -356,14 +558,19 @@
 
       saveButton.hidden = true;
 
-      if (state === "weekend") {
+      if (state === "vacation") {
+        setWorkButton(button, getVacationLabel(vacation, settings) + " · 출퇴근 기록 없음", "", "leave");
+      } else if (state === "weekend") {
         setWorkButton(button, "오늘은 쉬어가는 날", "", "");
       } else if (todayAttendance && todayAttendance.clockOutAt) {
         setWorkButton(button, "퇴근 완료", "", "complete");
       } else if (recorded) {
         setWorkButton(button, "오늘 근무기록 저장 완료", "", "complete");
       } else if (!todayAttendance || !todayAttendance.clockInAt) {
-        setWorkButton(button, "출근하기", "clock-in", "check-in");
+        var checkInLabel = vacation && state === "before"
+          ? getVacationLabel(vacation, settings) + " · " + formatTimeFromDate(schedule.start) + " 출근"
+          : "출근하기";
+        setWorkButton(button, checkInLabel, "clock-in", "check-in");
       } else if (state === "overtime") {
         setWorkButton(button, "야근 중 · " + settings.overtimeEndTime + " 종료", "checkout", "overtime");
       } else {
@@ -383,11 +590,15 @@
 
     function saveAttendance() {
       saveJson(ATTENDANCE_KEY, attendance);
+      lastCalendarSignature = "";
+      renderCalendar(new Date());
     }
 
     function clockIn() {
       var now = new Date();
-      var schedule = getSchedule(now, settings);
+      var vacation = findVacation(vacations, localDateId(now));
+      var schedule = getSchedule(now, settings, vacation);
+      if (schedule.isFullLeave) return;
       var isLate = now > schedule.start;
 
       openAttendanceDialog(
@@ -399,7 +610,8 @@
             date: localDateId(confirmedAt),
             clockInAt: confirmedAt.toISOString(),
             clockOutAt: null,
-            late: isLate
+            late: isLate,
+            vacationId: vacation ? vacation.id : null
           };
           saveAttendance();
           renderClock();
@@ -410,7 +622,8 @@
 
     function clockOut() {
       var now = new Date();
-      var schedule = getSchedule(now, settings);
+      var vacation = findVacation(vacations, localDateId(now));
+      var schedule = getSchedule(now, settings, vacation);
       var prompt =
         now < schedule.countdownEnd
           ? "아직 퇴근 시간이 경과하지 않았습니다. 정말 퇴근하시겠습니까?"
@@ -446,6 +659,8 @@
           history.push({ date: today, minutes: record.minutes, savedAt: confirmedAt.toISOString() });
         }
         saveJson(HISTORY_KEY, history);
+        lastCalendarSignature = "";
+        renderCalendar(new Date());
         renderHistory();
         renderClock();
         showToast("퇴근을 기록했어요.");
@@ -574,6 +789,8 @@
         savedAt: new Date().toISOString()
       });
       saveJson(HISTORY_KEY, history);
+      lastCalendarSignature = "";
+      renderCalendar(new Date());
       renderHistory();
       renderClock();
       showToast("오늘 근무기록을 저장했어요.");
@@ -592,6 +809,9 @@
         settings = loadSettings();
         history = loadHistory();
         attendance = loadAttendance();
+        vacations = loadVacations();
+        lastCalendarSignature = "";
+        renderCalendar(new Date());
         renderHistory();
         renderClock();
       }
@@ -611,13 +831,16 @@
       lunchMinutes: $("lunchMinutes"),
       overtimeEnabled: $("overtimeEnabled"),
       overtimeEndTime: $("overtimeEndTime"),
-      includeOvertimeInProgress: $("includeOvertimeInProgress")
+      includeOvertimeInProgress: $("includeOvertimeInProgress"),
+      hireDate: $("hireDate"),
+      allowVacationAdvance: $("allowVacationAdvance")
     };
 
     Object.keys(fields).forEach(function (key) {
       if (fields[key].type === "checkbox") fields[key].checked = Boolean(settings[key]);
       else fields[key].value = settings[key];
     });
+    fields.hireDate.max = localDateId(new Date());
 
     function readForm() {
       return {
@@ -629,7 +852,9 @@
         lunchMinutes: Math.max(0, Math.min(240, Number(fields.lunchMinutes.value || 0))),
         overtimeEnabled: fields.overtimeEnabled.checked,
         overtimeEndTime: fields.overtimeEndTime.value,
-        includeOvertimeInProgress: fields.includeOvertimeInProgress.checked
+        includeOvertimeInProgress: fields.includeOvertimeInProgress.checked,
+        hireDate: fields.hireDate.value,
+        allowVacationAdvance: fields.allowVacationAdvance.checked
       };
     }
 
@@ -684,7 +909,22 @@
           return "야근 종료 시각은 정규 퇴근 후 12시간 안으로 설정해주세요.";
         }
       }
+
+      if (value.hireDate && value.hireDate > localDateId(new Date())) {
+        return "입사일은 오늘보다 미래일 수 없어요.";
+      }
       return "";
+    }
+
+    function renderVacationSettings(value) {
+      if (!value.hireDate) {
+        $("vacationSettingsNote").textContent = "입사일을 입력하면 법정 발생 기준을 확인할 수 있어요.";
+        return;
+      }
+      var balance = core.calculateBalance(value.hireDate, loadVacations(), localDateId(new Date()));
+      $("vacationSettingsNote").textContent =
+        "현재 " + balance.label + " " + formatUnits(balance.granted) + "일 발생 · " +
+        (value.allowVacationAdvance ? "마이너스 잔여 허용" : "보유 일수 안에서만 신청");
     }
 
     function renderSummary() {
@@ -717,6 +957,7 @@
         : "휴게시간 제외 없이 " + formatDuration(regularMinutes + overtimeMinutes) + " 근무해요.";
       $("summaryChip").textContent = value.overtimeEnabled ? "야근 " + formatDuration(overtimeMinutes) : "정시 퇴근";
       $("formError").textContent = validate(value);
+      renderVacationSettings(value);
     }
 
     fields.lunchEnabled.addEventListener("change", function () {
@@ -744,7 +985,9 @@
       fields.startTime,
       fields.endTime,
       fields.overtimeEndTime,
-      fields.includeOvertimeInProgress
+      fields.includeOvertimeInProgress,
+      fields.hireDate,
+      fields.allowVacationAdvance
     ].forEach(function (field) {
       field.addEventListener("change", renderSummary);
     });
@@ -772,7 +1015,270 @@
     renderSummary();
   }
 
+  function initVacation() {
+    var settings = loadSettings();
+    var vacations = loadVacations();
+    var attendance = loadAttendance();
+    var history = loadHistory();
+    var form = $("vacationForm");
+    var dateField = $("vacationDate");
+    var memoField = $("vacationMemo");
+    var todayId = localDateId(new Date());
+
+    dateField.min = todayId;
+    dateField.value = todayId;
+
+    function selectedType() {
+      var selected = form.querySelector('input[name="vacationType"]:checked');
+      return selected ? selected.value : "full";
+    }
+
+    function selectedPeriod() {
+      var selected = form.querySelector('input[name="vacationPeriod"]:checked');
+      return selected ? selected.value : "am";
+    }
+
+    function disableForm(disabled) {
+      Array.prototype.forEach.call(form.elements, function (element) {
+        element.disabled = disabled;
+      });
+      form.classList.toggle("is-disabled", disabled);
+    }
+
+    function renderBalance() {
+      var hasHireDate = Boolean(settings.hireDate);
+      $("vacationSetupPrompt").hidden = hasHireDate;
+      disableForm(!hasHireDate);
+      $("advanceBadge").hidden = !settings.allowVacationAdvance;
+
+      if (!hasHireDate) {
+        $("balanceLabel").textContent = "현재 사용 가능";
+        $("balanceTitle").textContent = "입사일을 입력해주세요";
+        $("balanceKind").textContent = "휴가";
+        $("balanceValue").textContent = "—";
+        $("grantedValue").textContent = "—";
+        $("usedValue").textContent = "—";
+        $("expiryValue").textContent = "—";
+        $("nextGrantText").textContent = "설정에서 입사일을 먼저 저장해주세요.";
+        return;
+      }
+
+      var balance = core.calculateBalance(settings.hireDate, vacations, todayId);
+      $("balanceLabel").textContent = balance.remaining < 0 ? "당겨쓴 휴가 포함" : "현재 사용 가능";
+      $("balanceTitle").textContent = balance.label + " 잔여";
+      $("balanceKind").textContent = balance.label;
+      $("balanceValue").textContent = formatUnits(balance.remaining);
+      $("balanceValue").classList.toggle("negative", balance.remaining < 0);
+      $("grantedValue").textContent = formatUnits(balance.granted) + "일";
+      $("usedValue").textContent = formatUnits(balance.used) + "일";
+      $("expiryValue").textContent = formatDateShort(dateIdBefore(balance.periodEnd));
+      $("fullVacationLabel").textContent = balance.label + " 1일";
+
+      if (balance.nextGrantDate) {
+        $("nextGrantText").textContent = balance.serviceYears === 0
+          ? formatDateShort(balance.nextGrantDate) + "에 월차 1일이 추가돼요."
+          : formatDateShort(balance.nextGrantDate) + "에 다음 연차가 발생해요.";
+      } else {
+        $("nextGrantText").textContent = "첫 입사기념일까지 사용할 수 있어요.";
+      }
+    }
+
+    function renderFormState() {
+      var type = selectedType();
+      var isPartial = type === "half" || type === "quarter";
+      $("vacationPeriodFields").hidden = !isPartial;
+
+      if (dateField.value && settings.hireDate) {
+        var entitlement = core.getEntitlement(settings.hireDate, dateField.value);
+        if (entitlement.eligible) $("fullVacationLabel").textContent = entitlement.label + " 1일";
+      }
+
+      if (isPartial && dateField.value) {
+        var previewVacation = {
+          date: dateField.value,
+          type: type,
+          period: selectedPeriod()
+        };
+        $("vacationSchedulePreview").textContent = getVacationScheduleText(previewVacation, settings);
+      }
+
+      var units = type === "full" ? 1 : type === "half" ? 0.5 : type === "quarter" ? 0.25 : 0;
+      $("vacationSubmit").textContent = units
+        ? "신청하기 · " + formatUnits(units) + "일 차감"
+        : "신청하기 · 연차 비차감";
+      $("vacationFormError").textContent = "";
+    }
+
+    function validateRequest() {
+      if (!settings.hireDate) return "설정에서 입사일을 먼저 입력해주세요.";
+      if (!dateField.value) return "휴가를 사용할 날짜를 선택해주세요.";
+      if (dateField.value < todayId) return "지난 날짜에는 휴가를 신청할 수 없어요.";
+
+      var requestDate = core.parseDateId(dateField.value);
+      if (!requestDate || isWeekend(requestDate)) return "주말이 아닌 근무일을 선택해주세요.";
+      if (findVacation(vacations, dateField.value)) return "선택한 날짜에는 이미 신청한 휴가가 있어요.";
+
+      var type = selectedType();
+      var period = selectedPeriod();
+      var existingAttendance = attendance[dateField.value];
+      var completedHistory = history.some(function (record) {
+        return record.date === dateField.value;
+      });
+      if (completedHistory) return "이미 근무 완료 기록이 있는 날짜예요.";
+      if (
+        existingAttendance &&
+        existingAttendance.clockInAt &&
+        (isFullDayVacation({ type: type }) || period === "am")
+      ) {
+        return "이미 출근한 날에는 전일 또는 오전 휴가를 신청할 수 없어요.";
+      }
+
+      var units = core.getVacationUnits({ type: type });
+      if (units > 0) {
+        var balance = core.calculateBalance(settings.hireDate, vacations, dateField.value);
+        if (!balance.eligible) return "입사일 이후의 날짜를 선택해주세요.";
+        if (!settings.allowVacationAdvance && balance.remaining - units < 0) {
+          return "남은 " + balance.label + "가 부족해요. 설정에서 당겨쓰기를 켜면 신청할 수 있어요.";
+        }
+      }
+      return "";
+    }
+
+    function renderVacationList() {
+      var list = $("vacationList");
+      var sorted = vacations.slice().sort(function (a, b) {
+        return String(b.date || "").localeCompare(String(a.date || "")) ||
+          String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+      });
+      $("vacationCount").textContent = vacations.length + "개";
+      list.innerHTML = "";
+
+      if (!sorted.length) {
+        var empty = document.createElement("div");
+        empty.className = "history-empty vacation-empty";
+        empty.innerHTML = "<strong>아직 신청한 휴가가 없어요.</strong><span>신청하면 출퇴근 일정에도 바로 반영돼요.</span>";
+        list.appendChild(empty);
+        return;
+      }
+
+      sorted.forEach(function (vacation) {
+        var article = document.createElement("article");
+        article.className = "vacation-item";
+        var header = document.createElement("div");
+        header.className = "vacation-item-heading";
+        var titleWrap = document.createElement("div");
+        var date = document.createElement("time");
+        date.dateTime = vacation.date;
+        date.textContent = formatDateLong(vacation.date);
+        var title = document.createElement("h3");
+        title.textContent = getVacationLabel(vacation, settings);
+        titleWrap.append(date, title);
+        var status = document.createElement("span");
+        status.className = "vacation-status";
+        status.textContent = vacation.date < todayId ? "사용 완료" : vacation.date === todayId ? "오늘" : "신청 완료";
+        header.append(titleWrap, status);
+
+        var detail = document.createElement("p");
+        detail.className = "vacation-item-detail";
+        detail.textContent = getVacationScheduleText(vacation, settings) +
+          (core.isChargeableVacation(vacation)
+            ? " · " + formatUnits(core.getVacationUnits(vacation)) + "일 차감"
+            : " · 연차 비차감");
+        article.append(header, detail);
+
+        if (vacation.memo) {
+          var memo = document.createElement("p");
+          memo.className = "vacation-item-memo";
+          memo.textContent = vacation.memo;
+          article.appendChild(memo);
+        }
+
+        var cancel = document.createElement("button");
+        cancel.className = "vacation-cancel";
+        cancel.type = "button";
+        cancel.dataset.vacationId = vacation.id;
+        cancel.textContent = "신청 취소";
+        article.appendChild(cancel);
+        list.appendChild(article);
+      });
+    }
+
+    function renderAll() {
+      renderBalance();
+      renderFormState();
+      renderVacationList();
+    }
+
+    form.addEventListener("change", renderFormState);
+    dateField.addEventListener("input", renderFormState);
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var error = validateRequest();
+      $("vacationFormError").textContent = error;
+      if (error) return;
+
+      var type = selectedType();
+      var vacation = {
+        id: "vacation-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+        date: dateField.value,
+        type: type,
+        period: type === "half" || type === "quarter" ? selectedPeriod() : "day",
+        units: core.getVacationUnits({ type: type }),
+        memo: memoField.value.trim(),
+        createdAt: new Date().toISOString()
+      };
+
+      vacations.push(vacation);
+      if (!saveJson(VACATION_KEY, vacations)) {
+        vacations.pop();
+        $("vacationFormError").textContent = "휴가를 저장하지 못했어요. 브라우저 저장공간을 확인해주세요.";
+        return;
+      }
+
+      memoField.value = "";
+      form.querySelector('input[name="vacationType"][value="full"]').checked = true;
+      form.querySelector('input[name="vacationPeriod"][value="am"]').checked = true;
+      renderAll();
+      var updatedBalance = core.calculateBalance(settings.hireDate, vacations, todayId);
+      showToast(
+        updatedBalance.remaining < 0
+          ? "휴가를 신청했어요. 잔여 " + formatUnits(updatedBalance.remaining) + "일이에요."
+          : "휴가를 신청하고 출퇴근 일정에 반영했어요."
+      );
+    });
+
+    $("vacationList").addEventListener("click", function (event) {
+      var button = event.target.closest("[data-vacation-id]");
+      if (!button) return;
+      var targetVacation = vacations.find(function (vacation) {
+        return vacation.id === button.dataset.vacationId;
+      });
+      if (!targetVacation) return;
+      if (!window.confirm(formatDateLong(targetVacation.date) + " 휴가 신청을 취소할까요?")) return;
+
+      vacations = vacations.filter(function (vacation) {
+        return vacation.id !== targetVacation.id;
+      });
+      saveJson(VACATION_KEY, vacations);
+      renderAll();
+      showToast("휴가 신청을 취소했어요.");
+    });
+
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) {
+        settings = loadSettings();
+        vacations = loadVacations();
+        attendance = loadAttendance();
+        history = loadHistory();
+        renderAll();
+      }
+    });
+
+    renderAll();
+  }
+
   var page = document.body.dataset.page;
   if (page === "home") initHome();
   if (page === "settings") initSettings();
+  if (page === "vacation") initVacation();
 })();
