@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fafafa" />
+    <meta name="description" content="Alarmm에서 월차, 연차, 반차와 반반차를 계산하고 신청하세요." />
+    <title>Alarmm · Vacation</title>
+    <link rel="icon" href="./assets/figma-avatar-circle.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-page="vacation">
+    <div class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="header-kicker">Vacation</p>
+          <h1 class="header-title">휴가</h1>
+        </div>
+        <a class="profile-link" href="./settings.html" aria-label="휴가 설정 열기">
+          <img src="./assets/figma-avatar-circle.svg" alt="" width="56" height="56" />
+          <span aria-hidden="true">A</span>
+        </a>
+      </header>
+
+      <main class="page-content vacation-content">
+        <section class="card balance-card" aria-labelledby="balanceTitle">
+          <div class="balance-heading">
+            <div>
+              <p id="balanceLabel">현재 사용 가능</p>
+              <h2 id="balanceTitle">입사일을 입력해주세요</h2>
+            </div>
+            <span class="balance-kind" id="balanceKind">휴가</span>
+          </div>
+          <div class="balance-value">
+            <strong id="balanceValue">—</strong>
+            <span>일</span>
+          </div>
+          <div class="balance-stats">
+            <span><small>발생</small><strong id="grantedValue">—</strong></span>
+            <span><small>사용·예정</small><strong id="usedValue">—</strong></span>
+            <span><small>사용 기한</small><strong id="expiryValue">—</strong></span>
+          </div>
+          <p class="balance-next" id="nextGrantText">설정에서 입사일을 먼저 저장해주세요.</p>
+        </section>
+
+        <a class="setup-vacation-card" id="vacationSetupPrompt" href="./settings.html">
+          <span>
+            <strong>입사일 설정이 필요해요.</strong>
+            <small>설정에서 입사일을 저장하면 신청할 수 있어요.</small>
+          </span>
+          <b aria-hidden="true">→</b>
+        </a>
+
+        <form class="card vacation-apply-card" id="vacationForm" novalidate>
+          <div class="card-heading-row vacation-form-heading">
+            <div>
+              <p class="summary-kicker vacation-kicker">새 휴가</p>
+              <h2>신청하기</h2>
+            </div>
+            <span class="mini-badge" id="advanceBadge" hidden>당겨쓰기 가능</span>
+          </div>
+
+          <label class="field-control vacation-date-field">
+            <span>사용 날짜</span>
+            <input id="vacationDate" name="vacationDate" type="date" required />
+          </label>
+
+          <fieldset class="vacation-type-fieldset">
+            <legend>휴가 유형</legend>
+            <div class="vacation-type-grid">
+              <label class="vacation-choice">
+                <input type="radio" name="vacationType" value="full" checked />
+                <span><strong id="fullVacationLabel">연차 1일</strong><small>1일 차감</small></span>
+              </label>
+              <label class="vacation-choice">
+                <input type="radio" name="vacationType" value="half" />
+                <span><strong>반차</strong><small>0.5일 차감</small></span>
+              </label>
+              <label class="vacation-choice">
+                <input type="radio" name="vacationType" value="quarter" />
+                <span><strong>반반차</strong><small>0.25일 차감</small></span>
+              </label>
+              <label class="vacation-choice">
+                <input type="radio" name="vacationType" value="health" />
+                <span><strong>보건 휴가</strong><small>연차 비차감</small></span>
+              </label>
+              <label class="vacation-choice wide-choice">
+                <input type="radio" name="vacationType" value="bereavement" />
+                <span><strong>경조사 휴가</strong><small>연차 비차감 · 회사 규정 적용</small></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="vacation-period-fieldset" id="vacationPeriodFields" hidden>
+            <legend>사용 시간대</legend>
+            <div class="period-segment">
+              <label><input type="radio" name="vacationPeriod" value="am" checked /><span>오전</span></label>
+              <label><input type="radio" name="vacationPeriod" value="pm" /><span>오후</span></label>
+            </div>
+            <p id="vacationSchedulePreview">휴가에 맞춰 출퇴근 시각을 계산해드려요.</p>
+          </fieldset>
+
+          <label class="field-control vacation-memo-field">
+            <span>메모 <em>선택</em></span>
+            <input id="vacationMemo" name="vacationMemo" type="text" maxlength="60" placeholder="필요한 내용을 남겨주세요" />
+          </label>
+
+          <p class="form-error vacation-form-error" id="vacationFormError" role="alert"></p>
+          <button class="save-button" id="vacationSubmit" type="submit">신청하기</button>
+        </form>
+
+        <section class="card vacation-history-card" aria-labelledby="vacationHistoryTitle">
+          <div class="card-heading-row">
+            <h2 id="vacationHistoryTitle">신청 내역</h2>
+            <span class="mini-badge" id="vacationCount">0개</span>
+          </div>
+          <div class="vacation-list" id="vacationList"></div>
+        </section>
+
+        <section class="card vacation-rules-card" aria-labelledby="vacationRulesTitle">
+          <h2 id="vacationRulesTitle">계산 기준</h2>
+          <ul>
+            <li>1년 미만은 1개월 개근할 때마다 1일, 최대 11일이 발생해요.</li>
+            <li>1년간 80% 이상 출근하면 15일, 3년차부터 2년마다 1일이 늘어나며 최대 25일이에요.</li>
+            <li>1년 미만 발생분은 첫 입사기념일까지, 이후 연차는 발생일부터 1년간 계산해요.</li>
+            <li>월 개근과 연 80% 출근을 충족한 것으로 계산하며, 법정 기준은 통상 상시 5명 이상·주 15시간 이상 사업장에 적용돼요.</li>
+            <li>반차·반반차와 보건·경조 휴가는 회사 취업규칙 또는 합의 내용을 함께 확인해주세요.</li>
+          </ul>
+          <a href="https://www.law.go.kr/법령/근로기준법/제60조" target="_blank" rel="noreferrer">근로기준법 제60조 보기</a>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="주요 메뉴">
+        <a class="nav-item" href="./index.html">
+          <span class="nav-dot" aria-hidden="true"></span>
+          <span>Home</span>
+        </a>
+        <a class="nav-item" href="./settings.html">
+          <span class="nav-dot" aria-hidden="true"></span>
+          <span>Setting</span>
+        </a>
+        <a class="nav-item active" href="./vacation.html" aria-current="page">
+          <span class="nav-dot" aria-hidden="true"></span>
+          <span>Vacation</span>
+        </a>
+      </nav>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./vacation-core.js" defer></script>
+    <script src="./app.js" defer></script>
+  </body>
+</html>

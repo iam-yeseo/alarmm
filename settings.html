@@ -120,6 +120,31 @@
             </div>
           </section>
 
+          <section class="card settings-card" aria-labelledby="vacationSettingsTitle">
+            <div class="section-heading">
+              <span class="section-number">04</span>
+              <div>
+                <h2 id="vacationSettingsTitle">휴가 설정</h2>
+                <p>입사일을 기준으로 월차와 연차를 자동 계산해요.</p>
+              </div>
+            </div>
+
+            <label class="field-control">
+              <span>입사일</span>
+              <input id="hireDate" name="hireDate" type="date" />
+            </label>
+            <label class="check-row vacation-advance-row">
+              <input id="allowVacationAdvance" name="allowVacationAdvance" type="checkbox" />
+              <span>
+                <strong>휴가 당겨쓰기 허용</strong>
+                <small>잔여 휴가보다 더 신청하면 0 아래의 마이너스 잔여로 기록해요.</small>
+              </span>
+            </label>
+            <p class="field-note accent-note" id="vacationSettingsNote">
+              입사일을 입력하면 법정 발생 기준을 확인할 수 있어요.
+            </p>
+          </section>
+
           <section class="card summary-card" aria-labelledby="summaryTitle">
             <div>
               <p class="summary-kicker">오늘의 시간표</p>
@@ -144,10 +169,15 @@
           <span class="nav-dot" aria-hidden="true"></span>
           <span>Setting</span>
         </a>
+        <a class="nav-item" href="./vacation.html">
+          <span class="nav-dot" aria-hidden="true"></span>
+          <span>Vacation</span>
+        </a>
       </nav>
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./vacation-core.js" defer></script>
     <script src="./app.js" defer></script>
   </body>
 </html>

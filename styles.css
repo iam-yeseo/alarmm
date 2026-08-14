@@ -43,13 +43,15 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
 }
 
 button,
 a,
 input,
+textarea,
 label {
   -webkit-tap-highlight-color: transparent;
 }
@@ -73,6 +75,10 @@ h2,
 p,
 ol {
   margin: 0;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 ol {
@@ -223,9 +229,14 @@ ol {
   background: #bbbbbb;
 }
 
-.week-day.weekend i {
+.week-day.no-attendance i {
   border: 1px solid #bbbbbb;
   background: transparent;
+}
+
+.week-day.vacation-date strong {
+  color: var(--pink-dark);
+  background: var(--pink-wash);
 }
 
 .week-day.today small {
@@ -240,6 +251,47 @@ ol {
 
 .week-day.today i {
   background: var(--pink);
+}
+
+.week-day.today.no-attendance i {
+  border-color: var(--pink);
+  background: transparent;
+}
+
+.today-vacation-banner {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(242, 116, 144, 0.18);
+  border-radius: var(--radius);
+  color: var(--pink-dark);
+  background: var(--pink-wash);
+}
+
+.today-vacation-banner span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.today-vacation-banner small,
+.today-vacation-banner em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.today-vacation-banner strong {
+  font-size: 16px;
+}
+
+.today-vacation-banner em {
+  flex: 0 0 auto;
+  text-align: right;
 }
 
 .clock-card {
@@ -392,6 +444,11 @@ ol {
   color: var(--pink-dark);
   background: var(--pink-soft);
   cursor: pointer;
+}
+
+.work-state.leave {
+  color: var(--pink-dark);
+  background: var(--pink-wash);
 }
 
 .work-state.overtime {
@@ -643,7 +700,7 @@ ol {
   display: grid;
   width: min(100%, var(--app-width));
   height: calc(78px + env(safe-area-inset-bottom));
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   padding: 11px 24px calc(10px + env(safe-area-inset-bottom));
   background: rgba(255, 255, 255, 0.94);
   border-top: 1px solid rgba(240, 240, 240, 0.9);
@@ -973,6 +1030,386 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   color: var(--muted);
   font-size: 11px;
   text-align: center;
+}
+
+/* Vacation */
+.vacation-content {
+  display: grid;
+  gap: 12px;
+  padding-top: 24px;
+}
+
+.balance-card {
+  padding: 22px 20px 20px;
+  color: #ffffff;
+  background: linear-gradient(145deg, var(--pink), #ec6f8a);
+  box-shadow: 0 16px 34px rgba(242, 116, 144, 0.2);
+}
+
+.balance-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.balance-heading p {
+  margin-bottom: 4px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
+}
+
+.balance-heading h2 {
+  font-size: 18px;
+}
+
+.balance-kind {
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: var(--pink-dark);
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.balance-value {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin: 18px 0 20px;
+}
+
+.balance-value strong {
+  font-size: 58px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.balance-value strong.negative {
+  color: #fff1f4;
+}
+
+.balance-value span {
+  padding-bottom: 3px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.balance-stats {
+  display: grid;
+  grid-template-columns: 0.8fr 1fr 1.35fr;
+  gap: 6px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.balance-stats span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.balance-stats small {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+}
+
+.balance-stats strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.balance-next {
+  margin-top: 14px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
+}
+
+.setup-vacation-card {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--pink-soft);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.setup-vacation-card span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setup-vacation-card strong {
+  font-size: 14px;
+}
+
+.setup-vacation-card small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.setup-vacation-card b {
+  color: var(--pink);
+  font-size: 20px;
+}
+
+.vacation-apply-card,
+.vacation-history-card,
+.vacation-rules-card {
+  padding: 20px;
+}
+
+.vacation-apply-card.is-disabled {
+  opacity: 0.48;
+}
+
+.vacation-form-heading {
+  margin-bottom: 18px;
+}
+
+.vacation-kicker {
+  margin-bottom: 3px;
+  color: var(--pink);
+}
+
+.vacation-date-field {
+  margin-bottom: 18px;
+}
+
+.vacation-type-fieldset,
+.vacation-period-fieldset {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.vacation-type-fieldset legend,
+.vacation-period-fieldset legend {
+  padding: 0;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.vacation-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.vacation-choice {
+  position: relative;
+  cursor: pointer;
+}
+
+.vacation-choice.wide-choice {
+  grid-column: 1 / -1;
+}
+
+.vacation-choice input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.vacation-choice span {
+  display: flex;
+  min-height: 66px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #ffffff;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.vacation-choice strong {
+  font-size: 14px;
+}
+
+.vacation-choice small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.vacation-choice input:checked + span {
+  border-color: var(--pink);
+  color: var(--pink-dark);
+  background: var(--pink-wash);
+}
+
+.vacation-choice input:focus-visible + span {
+  outline: 3px solid rgba(242, 116, 144, 0.22);
+  outline-offset: 2px;
+}
+
+.vacation-period-fieldset {
+  margin-top: 18px;
+}
+
+.period-segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  padding: 4px;
+  border-radius: 13px;
+  background: #f3f3f3;
+}
+
+.period-segment label {
+  position: relative;
+  cursor: pointer;
+}
+
+.period-segment input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.period-segment span {
+  display: grid;
+  min-height: 40px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.period-segment input:checked + span {
+  color: var(--pink-dark);
+  background: #ffffff;
+  box-shadow: 0 3px 10px rgba(34, 34, 34, 0.06);
+}
+
+.vacation-period-fieldset > p {
+  margin-top: 8px;
+  color: var(--pink-dark);
+  font-size: 11px;
+  text-align: center;
+}
+
+.vacation-memo-field {
+  margin-top: 18px;
+}
+
+.vacation-memo-field em {
+  color: var(--gray);
+  font-style: normal;
+}
+
+.vacation-form-error {
+  margin-top: 12px;
+}
+
+.vacation-list {
+  margin-top: 12px;
+}
+
+.vacation-item {
+  position: relative;
+  padding: 15px 4px 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vacation-item:last-child {
+  border-bottom: 0;
+}
+
+.vacation-item-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vacation-item time {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.vacation-item h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.vacation-status {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  border-radius: 999px;
+  color: var(--pink-dark);
+  background: var(--pink-wash);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.vacation-item-detail,
+.vacation-item-memo {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.vacation-item-memo {
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: #f7f7f7;
+}
+
+.vacation-cancel {
+  margin-top: 9px;
+  padding: 6px 0;
+  color: #999999;
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.vacation-rules-card h2 {
+  margin-bottom: 13px;
+}
+
+.vacation-rules-card ul {
+  padding-left: 18px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.vacation-rules-card a {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--pink-dark);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.vacation-advance-row {
+  margin-top: 16px;
 }
 
 .dialog-backdrop {
