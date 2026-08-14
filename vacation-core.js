@@ -108,6 +108,7 @@
     if (vacation.type === "full") return 1;
     if (vacation.type === "half") return 0.5;
     if (vacation.type === "quarter") return 0.25;
+    if (vacation.type === "birthday") return 0.5;
     return 0;
   }
 

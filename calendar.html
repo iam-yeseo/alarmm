@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fafafa" />
+    <meta name="description" content="Alarmm 월별 출근일과 누적 근무시간을 확인하세요." />
+    <title>Alarmm · Personal</title>
+    <link rel="icon" href="./assets/user.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles-v2.css" />
+  </head>
+  <body class="design-v2" data-page="calendar">
+    <div class="app-shell">
+      <main class="calendar-content">
+        <section class="calendar-panel" aria-labelledby="calendarMonthLabel">
+          <div class="calendar-heading"><h1 id="calendarMonthLabel">2026년 8월</h1><div><button id="calendarPrev" type="button" aria-label="이전 달"><img src="./assets/month-prev.svg" alt="" /></button><button id="calendarNext" type="button" aria-label="다음 달"><img src="./assets/month-next.svg" alt="" /></button></div></div>
+          <div class="calendar-weekdays" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+          <div class="month-grid" id="monthlyCalendar" role="grid" aria-label="월간 근무 달력"></div>
+        </section>
+
+        <section class="calendar-stat-card attendance-stat" aria-labelledby="monthAttendanceTitle">
+          <div class="stat-heading"><h2 id="monthAttendanceTitle">이번 달 출근일</h2><strong id="monthAttendanceCount">0일</strong></div>
+          <div class="stat-track"><span id="monthAttendanceBar"></span></div><div class="stat-scale"><span>0일</span><span id="monthDaysLabel">31일</span></div>
+        </section>
+
+        <section class="calendar-stat-card totals-section" aria-labelledby="calendarTotalsTitle">
+          <h2 id="calendarTotalsTitle">누적 근무시간</h2>
+          <div class="calendar-total-row"><div><span>이번 달</span><strong id="calendarMonthTotal">0시간 0분</strong></div><div class="stat-track"><span id="calendarMonthBar"></span></div></div>
+          <div class="calendar-total-row"><div><span>지난 달</span><strong id="calendarLastMonthTotal">0시간 0분</strong></div><div class="stat-track"><span id="calendarLastMonthBar"></span></div></div>
+          <div class="calendar-total-row"><div><span>올해</span><strong id="calendarYearTotal">0시간 0분</strong></div><div class="stat-track"><span id="calendarYearBar"></span></div></div>
+        </section>
+
+        <section class="calendar-stat-card calendar-history-card" aria-labelledby="calendarHistoryTitle"><h2 id="calendarHistoryTitle">이번 달 근무기록</h2><div class="history-list" id="calendarHistoryList"></div></section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="주요 메뉴">
+        <a class="nav-item" href="./index.html"><img src="./assets/nav-home.svg" alt="" /><span>HOME</span></a>
+        <a class="nav-item" href="./vacation.html"><img src="./assets/nav-vacation.svg" alt="" /><span>VACATION</span></a>
+        <a class="nav-item active" href="./calendar.html" aria-current="page"><img src="./assets/nav-personal-active.svg" alt="" /><span>PERSONAL</span></a>
+        <a class="nav-item" href="./settings.html"><img src="./assets/nav-settings.svg" alt="" /><span>SETTINGS</span></a>
+      </nav>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./vacation-core.js" defer></script><script src="./app.js" defer></script>
+  </body>
+</html>

@@ -4,152 +4,92 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#fafafa" />
-    <meta
-      name="description"
-      content="Alarmm으로 현재 시각과 퇴근까지 남은 시간을 한눈에 확인하세요."
-    />
+    <meta name="description" content="Alarmm으로 현재 시각과 퇴근까지 남은 시간을 한눈에 확인하세요." />
     <title>Alarmm · Home</title>
-    <link rel="icon" href="./assets/figma-avatar-circle.svg" />
+    <link rel="icon" href="./assets/user.svg" />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles-v2.css" />
   </head>
-  <body data-page="home">
+  <body class="design-v2" data-page="home">
     <div class="app-shell">
-      <header class="app-header">
-        <div>
-          <p class="header-kicker" id="attendanceMessage">오늘도 반가워요, Alarmm</p>
-          <h1 class="header-title">환영합니다.</h1>
-        </div>
-        <a class="profile-link" href="./settings.html" aria-label="설정 열기">
-          <img src="./assets/figma-avatar-circle.svg" alt="" width="56" height="56" />
-          <span aria-hidden="true">A</span>
-        </a>
+      <header class="brand-header">
+        <img class="brand-logo" src="./assets/calla-logo.svg" alt="calla" width="78" height="28" />
+        <a class="brand-user" href="./settings.html" aria-label="설정 열기"><img src="./assets/user.svg" alt="" width="32" height="32" /></a>
+        <p class="sr-only" id="attendanceMessage">오늘도 반가워요, Alarmm</p>
       </header>
 
       <main class="page-content home-content">
-        <section class="week-strip" aria-label="이번 주 날짜">
-          <ol id="weekCalendar" class="week-list"></ol>
-        </section>
+        <section class="week-strip" aria-label="이번 주 날짜"><ol id="weekCalendar" class="week-list"></ol></section>
 
         <a class="today-vacation-banner" id="todayVacationBanner" href="./vacation.html" hidden>
-          <span>
-            <small>오늘의 휴가</small>
-            <strong id="todayVacationTitle">휴가 사용일</strong>
-          </span>
+          <span><small>오늘의 휴가</small><strong id="todayVacationTitle">휴가 사용일</strong></span>
           <em id="todayVacationSchedule">출퇴근 일정 확인</em>
         </a>
 
         <section class="card clock-card" aria-labelledby="clockLabel">
           <button class="clock-toggle" id="clockToggle" type="button">
-            <span class="arc-gauge" aria-hidden="true">
-              <span class="arc-dial" id="arcDial"></span>
-            </span>
+            <span class="arc-gauge" aria-hidden="true"><span class="arc-dial" id="arcDial"></span></span>
             <span class="clock-copy">
               <span class="clock-label" id="clockLabel">현재 시각</span>
               <strong class="clock-time" id="clockTime">00:00:00</strong>
               <span class="clock-secondary" id="clockSecondary">남은 시간&nbsp; | &nbsp;--:--:--</span>
             </span>
           </button>
-
-          <button class="work-state" id="workStateButton" type="button" disabled>
-            <span class="work-state-label" id="workStateLabel">시간 계산 중</span>
-          </button>
-          <p class="interaction-hint">시간을 누르면 보기 방식을 바꿀 수 있어요.</p>
+          <div class="work-actions">
+            <button class="work-state" id="workStateButton" type="button" disabled><span class="work-state-label" id="workStateLabel">시간 계산 중</span></button>
+            <button class="checkout-button" id="checkoutButton" type="button" hidden>퇴근하기</button>
+          </div>
+          <p class="interaction-hint">시간을 클릭하면 보기 방식을 바꿀 수 있어요.</p>
         </section>
 
         <section class="card progress-card" aria-labelledby="progressTitle">
-          <div class="card-heading-row">
-            <h2 id="progressTitle">오늘 진행률</h2>
-            <strong id="progressPercent">0%</strong>
-          </div>
-          <div class="day-timeline" aria-hidden="true">
-            <span class="timeline-fill" id="timelineFill"></span>
-            <span class="timeline-marker lunch-start" id="lunchStartMarker"></span>
-            <span class="timeline-marker lunch-end" id="lunchEndMarker"></span>
-          </div>
+          <div class="card-heading-row"><h2 id="progressTitle">오늘 진행률</h2><strong id="progressPercent">0%</strong></div>
+          <div class="day-timeline" aria-hidden="true"><span class="timeline-fill" id="timelineFill"></span><span class="timeline-marker lunch-start" id="lunchStartMarker"></span><span class="timeline-marker lunch-end" id="lunchEndMarker"></span></div>
           <div class="timeline-labels">
-            <span>
-              <small>출근</small>
-              <strong id="timelineStart">09:00</strong>
-            </span>
-            <span class="timeline-lunch-label" id="timelineLunchWrap">
-              <small>점심</small>
-              <strong id="timelineLunch">12:00–13:00</strong>
-            </span>
-            <span>
-              <small id="timelineEndLabel">퇴근</small>
-              <strong id="timelineEnd">18:00</strong>
-            </span>
+            <span><small>출근</small><strong id="timelineStart">09:00</strong></span>
+            <span class="timeline-lunch-label" id="timelineLunchWrap"><small>점심</small><strong id="timelineLunch">12:00–13:00</strong></span>
+            <span><small id="timelineEndLabel">퇴근</small><strong id="timelineEnd">18:00</strong></span>
           </div>
+        </section>
+
+        <section class="card bus-card" aria-labelledby="busTitle">
+          <div class="card-heading-row"><h2 id="busTitle">퇴근길 미리보기</h2><button class="mini-filter" id="busModeButton" type="button">출근길 보기</button></div>
+          <div class="bus-list" id="busList">
+            <article class="bus-item"><div><small>성수SKV1센터1동 방면</small><strong class="bus-green">성동10</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
+            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-blue">302</strong></div><div><b>2분 30초</b><small>16분 23초</small></div></article>
+            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-lime">2012</strong></div><div><b>2분 30초</b><small>16분 23초</small></div></article>
+            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-lime">2022</strong></div><div><b>2분 30초</b><small>16분 23초</small></div></article>
+          </div>
+          <button class="text-button" id="busSettingsButton" type="button">출퇴근길 버스 설정하기</button>
         </section>
 
         <section class="card history-card" aria-labelledby="historyTitle">
-          <div class="card-heading-row">
-            <h2 id="historyTitle">최근 5일 근무기록</h2>
-            <span class="mini-badge" id="historyCount">0개</span>
-          </div>
+          <div class="card-heading-row"><h2 id="historyTitle">최근 5일 근무기록</h2><span class="sr-only" id="historyCount">0개</span></div>
           <div id="historyList" class="history-list"></div>
-          <button class="text-button" id="saveTodayButton" type="button" hidden>
-            오늘 근무기록 저장
-          </button>
+          <a class="text-button more-link" href="./calendar.html">근무기록 더 보기</a>
+          <button class="text-button" id="saveTodayButton" type="button" hidden>오늘 근무기록 저장</button>
         </section>
 
-        <section class="card totals-card" aria-labelledby="totalsTitle">
-          <h2 id="totalsTitle">누적 시간</h2>
-          <div class="total-row">
-            <div class="total-copy">
-              <span>이번 달</span>
-              <strong id="monthTotal">0시간 0분</strong>
-            </div>
-            <div class="slim-track"><span id="monthBar"></span></div>
-          </div>
-          <div class="total-row">
-            <div class="total-copy">
-              <span>지난 달</span>
-              <strong id="lastMonthTotal">0시간 0분</strong>
-            </div>
-            <div class="slim-track"><span id="lastMonthBar"></span></div>
-          </div>
-          <div class="total-row">
-            <div class="total-copy">
-              <span>올해</span>
-              <strong id="yearTotal">0시간 0분</strong>
-            </div>
-            <div class="slim-track"><span id="yearBar"></span></div>
-          </div>
+        <section class="totals-card" hidden aria-hidden="true">
+          <span id="monthTotal"></span><span id="lastMonthTotal"></span><span id="yearTotal"></span>
+          <span id="monthBar"></span><span id="lastMonthBar"></span><span id="yearBar"></span>
         </section>
       </main>
 
       <nav class="bottom-nav" aria-label="주요 메뉴">
-        <a class="nav-item active" href="./index.html" aria-current="page">
-          <span class="nav-dot" aria-hidden="true"></span>
-          <span>Home</span>
-        </a>
-        <a class="nav-item" href="./settings.html">
-          <span class="nav-dot" aria-hidden="true"></span>
-          <span>Setting</span>
-        </a>
-        <a class="nav-item" href="./vacation.html">
-          <span class="nav-dot" aria-hidden="true"></span>
-          <span>Vacation</span>
-        </a>
+        <a class="nav-item active" href="./index.html" aria-current="page"><img src="./assets/nav-home-active.svg" alt="" /><span>HOME</span></a>
+        <a class="nav-item" href="./vacation.html"><img src="./assets/nav-vacation.svg" alt="" /><span>VACATION</span></a>
+        <a class="nav-item" href="./calendar.html"><img src="./assets/nav-personal.svg" alt="" /><span>PERSONAL</span></a>
+        <a class="nav-item" href="./settings.html"><img src="./assets/nav-settings.svg" alt="" /><span>SETTINGS</span></a>
       </nav>
     </div>
 
     <div class="dialog-backdrop" id="attendanceDialog" hidden>
-      <section
-        class="attendance-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="attendanceDialogMessage"
-      >
+      <section class="attendance-dialog" role="dialog" aria-modal="true" aria-labelledby="attendanceDialogMessage">
         <p id="attendanceDialogMessage"></p>
-        <div class="dialog-actions">
-          <button class="dialog-button secondary" id="attendanceDialogCancel" type="button">취소</button>
-          <button class="dialog-button primary" id="attendanceDialogConfirm" type="button">확인</button>
-        </div>
+        <div class="dialog-actions"><button class="dialog-button secondary" id="attendanceDialogCancel" type="button">취소</button><button class="dialog-button primary" id="attendanceDialogConfirm" type="button">확인</button></div>
       </section>
     </div>
-
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./vacation-core.js" defer></script>
     <script src="./app.js" defer></script>

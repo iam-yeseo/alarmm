@@ -4,180 +4,80 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#fafafa" />
-    <meta name="description" content="Alarmm 근무, 점심, 야근 시간을 설정하세요." />
-    <title>Alarmm · Setting</title>
-    <link rel="icon" href="./assets/figma-avatar-circle.svg" />
+    <meta name="description" content="Alarmm 근무, 휴식, 입사일과 휴가 기준을 설정하세요." />
+    <title>Alarmm · Settings</title>
+    <link rel="icon" href="./assets/user.svg" />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles-v2.css" />
   </head>
-  <body data-page="settings">
+  <body class="design-v2" data-page="settings">
     <div class="app-shell">
-      <header class="app-header">
-        <div>
-          <p class="header-kicker">Settings</p>
-          <h1 class="header-title">설정</h1>
-        </div>
-        <a class="profile-link" href="./index.html" aria-label="홈으로 돌아가기">
-          <img src="./assets/figma-avatar-circle.svg" alt="" width="56" height="56" />
-          <span aria-hidden="true">A</span>
-        </a>
-      </header>
+      <header class="sub-header"><a href="./index.html" aria-label="홈으로 돌아가기"><img src="./assets/back.svg" alt="" /></a><h1>설정</h1></header>
 
       <main class="page-content settings-content">
         <form id="settingsForm" novalidate>
           <section class="card settings-card" aria-labelledby="basicSettingsTitle">
-            <div class="section-heading">
-              <span class="section-number">01</span>
-              <div>
-                <h2 id="basicSettingsTitle">기본 설정</h2>
-                <p>평소 출근과 퇴근 시각을 알려주세요.</p>
-              </div>
+            <div class="settings-heading"><div><h2 id="basicSettingsTitle">근무 시간 설정</h2><p>시간 설정 시 출퇴근 시간이 자동으로 계산됩니다.</p></div></div>
+            <div class="field-pair">
+              <label class="field-control"><span>근무 시작</span><input id="startTime" name="startTime" type="time" required /></label>
+              <label class="field-control is-readonly"><span>근무 종료(자동 입력)</span><input id="endTime" name="endTime" type="time" required readonly /></label>
             </div>
-
-            <div class="time-field-grid">
-              <label class="field-control">
-                <span>근무 시작</span>
-                <input id="startTime" name="startTime" type="time" required />
-              </label>
-              <label class="field-control">
-                <span>근무 종료</span>
-                <input id="endTime" name="endTime" type="time" required />
-              </label>
-            </div>
+            <label class="field-control number-control"><span>근무 시간(휴식시간 제외)</span><span class="number-field"><input id="workHours" name="workHours" type="number" min="1" max="16" step="0.5" inputmode="decimal" /><em>시간</em></span></label>
             <p class="field-note" id="workDurationNote">총 근무 시간을 계산하고 있어요.</p>
           </section>
 
           <section class="card settings-card" aria-labelledby="lunchSettingsTitle">
-            <div class="section-heading with-switch">
-              <span class="section-number">02</span>
-              <div>
-                <h2 id="lunchSettingsTitle">점심시간</h2>
-                <p>점심시간에는 진행률이 잠시 멈춰요.</p>
-              </div>
-              <label class="switch">
-                <input id="lunchEnabled" name="lunchEnabled" type="checkbox" />
-                <span aria-hidden="true"></span>
-                <span class="sr-only">점심시간 사용</span>
-              </label>
-            </div>
-
+            <div class="settings-heading with-switch"><div><h2 id="lunchSettingsTitle">휴식 시간 설정</h2><p>휴식 시간은 퇴근 시간에 자동으로 반영됩니다.</p></div><label class="switch"><input id="lunchEnabled" name="lunchEnabled" type="checkbox" /><span aria-hidden="true"></span><span class="sr-only">휴식 시간 사용</span></label></div>
             <div class="setting-group" id="lunchFields">
-              <div class="time-field-grid">
-                <label class="field-control">
-                  <span>점심 시작</span>
-                  <input id="lunchStart" name="lunchStart" type="time" />
-                </label>
-                <label class="field-control">
-                  <span>점심 종료</span>
-                  <input id="lunchEnd" name="lunchEnd" type="time" />
-                </label>
+              <div class="field-pair">
+                <label class="field-control"><span>시작 시간</span><input id="lunchStart" name="lunchStart" type="time" /></label>
+                <label class="field-control is-readonly"><span>종료 시간</span><input id="lunchEnd" name="lunchEnd" type="time" readonly /></label>
               </div>
-              <label class="field-control duration-control">
-                <span>점심시간</span>
-                <span class="number-field">
-                  <input
-                    id="lunchMinutes"
-                    name="lunchMinutes"
-                    type="number"
-                    min="0"
-                    max="240"
-                    step="5"
-                    inputmode="numeric"
-                  />
-                  <em>분</em>
-                </span>
-              </label>
+              <label class="field-control number-control"><span>휴식 시간</span><span class="number-field"><input id="lunchMinutes" name="lunchMinutes" type="number" min="0" max="240" step="5" inputmode="numeric" /><em>분</em></span></label>
               <p class="field-note" id="lunchDurationNote">설정한 구간과 분 단위를 함께 맞춰드려요.</p>
             </div>
           </section>
 
-          <section class="card settings-card" aria-labelledby="overtimeSettingsTitle">
-            <div class="section-heading with-switch">
-              <span class="section-number">03</span>
-              <div>
-                <h2 id="overtimeSettingsTitle">야근 설정</h2>
-                <p>오늘 야근한다면 실제 퇴근 예정 시각을 써주세요.</p>
-              </div>
-              <label class="switch">
-                <input id="overtimeEnabled" name="overtimeEnabled" type="checkbox" />
-                <span aria-hidden="true"></span>
-                <span class="sr-only">야근 사용</span>
-              </label>
-            </div>
+          <section class="card settings-card compact-card" aria-labelledby="hireDateTitle">
+            <div class="settings-heading"><div><h2 id="hireDateTitle">입사일 설정</h2><p>입사날짜를 설정하면 휴가 계산이 가능합니다.</p></div></div>
+            <label class="field-control inline-field"><span>입사일</span><input id="hireDate" name="hireDate" type="date" /></label>
+            <p class="field-note accent-note" id="vacationSettingsNote">입사일을 입력하면 법정 발생 기준을 확인할 수 있어요.</p>
+          </section>
 
+          <section class="card settings-card compact-card" aria-labelledby="birthdayTitle">
+            <div class="settings-heading"><div><h2 id="birthdayTitle">생일 설정</h2><p>생일 날짜에 맞춰 생일 반차가 지급됩니다.</p></div></div>
+            <label class="field-control inline-field"><span>내 생일</span><input id="birthday" name="birthday" type="date" /></label>
+          </section>
+
+          <section class="card toggle-card" aria-label="휴가 정책 설정">
+            <label class="policy-row"><span><strong>휴가 당겨쓰기 허용</strong><small>잔여 휴가가 부족하더라도 당겨쓸 수 있게 합니다.</small></span><span class="switch"><input id="allowVacationAdvance" name="allowVacationAdvance" type="checkbox" /><span aria-hidden="true"></span></span></label>
+            <label class="policy-row"><span><strong>미사용 연차 휴가 소진</strong><small>1년 내 연차 휴가를 사용하지 않으면 소진됩니다.</small></span><span class="switch"><input id="expireUnusedVacation" name="expireUnusedVacation" type="checkbox" /><span aria-hidden="true"></span></span></label>
+          </section>
+
+          <section class="card settings-card overtime-card" aria-labelledby="overtimeSettingsTitle">
+            <div class="settings-heading with-switch"><div><h2 id="overtimeSettingsTitle">오늘 야근 설정</h2><p>필요한 날에만 실제 퇴근 예정 시각을 적용합니다.</p></div><label class="switch"><input id="overtimeEnabled" name="overtimeEnabled" type="checkbox" /><span aria-hidden="true"></span><span class="sr-only">야근 사용</span></label></div>
             <div class="setting-group" id="overtimeFields">
-              <label class="field-control">
-                <span>야근 종료 예정</span>
-                <input id="overtimeEndTime" name="overtimeEndTime" type="time" />
-              </label>
-              <label class="check-row">
-                <input id="includeOvertimeInProgress" name="includeOvertimeInProgress" type="checkbox" />
-                <span>
-                  <strong>오늘 진행률에 야근 포함</strong>
-                  <small>켜면 홈의 100% 기준이 야근 종료 시각으로 바뀌어요.</small>
-                </span>
-              </label>
+              <label class="field-control"><span>야근 종료 예정</span><input id="overtimeEndTime" name="overtimeEndTime" type="time" /></label>
+              <label class="check-row"><input id="includeOvertimeInProgress" name="includeOvertimeInProgress" type="checkbox" /><span><strong>오늘 진행률에 야근 포함</strong><small>홈의 100% 기준을 야근 종료 시각으로 바꿔요.</small></span></label>
               <p class="field-note accent-note" id="overtimeDurationNote">야근을 사용하지 않아요.</p>
             </div>
           </section>
 
-          <section class="card settings-card" aria-labelledby="vacationSettingsTitle">
-            <div class="section-heading">
-              <span class="section-number">04</span>
-              <div>
-                <h2 id="vacationSettingsTitle">휴가 설정</h2>
-                <p>입사일을 기준으로 월차와 연차를 자동 계산해요.</p>
-              </div>
-            </div>
-
-            <label class="field-control">
-              <span>입사일</span>
-              <input id="hireDate" name="hireDate" type="date" />
-            </label>
-            <label class="check-row vacation-advance-row">
-              <input id="allowVacationAdvance" name="allowVacationAdvance" type="checkbox" />
-              <span>
-                <strong>휴가 당겨쓰기 허용</strong>
-                <small>잔여 휴가보다 더 신청하면 0 아래의 마이너스 잔여로 기록해요.</small>
-              </span>
-            </label>
-            <p class="field-note accent-note" id="vacationSettingsNote">
-              입사일을 입력하면 법정 발생 기준을 확인할 수 있어요.
-            </p>
-          </section>
-
-          <section class="card summary-card" aria-labelledby="summaryTitle">
-            <div>
-              <p class="summary-kicker">오늘의 시간표</p>
-              <h2 id="summaryTitle">09:00 — 18:00</h2>
-              <p id="summaryDescription">점심 60분을 제외하고 8시간 근무해요.</p>
-            </div>
-            <div class="summary-chip" id="summaryChip">정시 퇴근</div>
-          </section>
-
+          <section class="card summary-card" aria-labelledby="summaryTitle"><div><p class="summary-kicker">오늘의 시간표</p><h2 id="summaryTitle">09:00 — 18:00</h2><p id="summaryDescription">휴식 60분을 제외하고 8시간 근무해요.</p></div><div class="summary-chip" id="summaryChip">정시 퇴근</div></section>
           <p class="form-error" id="formError" role="alert"></p>
           <button class="save-button" type="submit">설정 저장하기</button>
-          <p class="save-caption">저장한 설정은 이 브라우저에 안전하게 보관됩니다.</p>
+          <p class="save-caption">저장한 설정은 이 브라우저에 보관됩니다.</p>
         </form>
       </main>
 
       <nav class="bottom-nav" aria-label="주요 메뉴">
-        <a class="nav-item" href="./index.html">
-          <span class="nav-dot" aria-hidden="true"></span>
-          <span>Home</span>
-        </a>
-        <a class="nav-item active" href="./settings.html" aria-current="page">
-          <span class="nav-dot" aria-hidden="true"></span>
-          <span>Setting</span>
-        </a>
-        <a class="nav-item" href="./vacation.html">
-          <span class="nav-dot" aria-hidden="true"></span>
-          <span>Vacation</span>
-        </a>
+        <a class="nav-item" href="./index.html"><img src="./assets/nav-home.svg" alt="" /><span>HOME</span></a>
+        <a class="nav-item" href="./vacation.html"><img src="./assets/nav-vacation.svg" alt="" /><span>VACATION</span></a>
+        <a class="nav-item" href="./calendar.html"><img src="./assets/nav-personal.svg" alt="" /><span>PERSONAL</span></a>
+        <a class="nav-item active" href="./settings.html" aria-current="page"><img src="./assets/nav-settings-active.svg" alt="" /><span>SETTINGS</span></a>
       </nav>
     </div>
-
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./vacation-core.js" defer></script>
-    <script src="./app.js" defer></script>
+    <script src="./vacation-core.js" defer></script><script src="./app.js" defer></script>
   </body>
 </html>
