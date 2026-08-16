@@ -28,8 +28,15 @@ export function readXmlTag(xml, tagName) {
 }
 
 export function normalizeServiceKey(value) {
-  const key = String(value || "").trim();
+  let key = String(value || "").replace(/^\uFEFF/, "").trim();
   if (!key) return "";
+
+  const parameterMatch = key.match(/(?:^|[?&])serviceKey=([^&]+)/i);
+  if (parameterMatch) key = parameterMatch[1];
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1).trim();
+  }
+
   try {
     return decodeURIComponent(key);
   } catch (_error) {
@@ -80,15 +87,16 @@ export function parseStopConfig(rawValue, fallback) {
 }
 
 export function parseBusXml(xml, stop) {
-  const headerCode = readXmlTag(xml, "headerCd");
-  const headerMessage = readXmlTag(xml, "headerMsg");
-  if (headerCode && headerCode !== "0") {
+  const headerCode = readXmlTag(xml, "headerCd") || readXmlTag(xml, "returnReasonCode") || readXmlTag(xml, "resultCode");
+  const headerMessage = readXmlTag(xml, "headerMsg") || readXmlTag(xml, "returnAuthMsg") || readXmlTag(xml, "resultMsg") || readXmlTag(xml, "errMsg");
+  if (headerCode && headerCode !== "0" && headerCode !== "00") {
     const error = new Error(headerMessage || "서울시 버스 API 요청에 실패했습니다.");
     error.code = `SEOUL_BUS_${headerCode}`;
     throw error;
   }
 
-  const routeFilter = new Set(normalizeRoutes(stop.routes));
+  const routeOrder = normalizeRoutes(stop.routes);
+  const routeFilter = new Set(routeOrder);
   const blocks = String(xml || "").match(/<itemList>[\s\S]*?<\/itemList>/gi) || [];
   return blocks.flatMap((block) => {
     const routeName = readXmlTag(block, "rtNm");
@@ -111,5 +119,37 @@ export function parseBusXml(xml, stop) {
       firstSeconds: parseArrivalSeconds(readXmlTag(block, "traTime1"), firstMessage),
       secondSeconds: parseArrivalSeconds(readXmlTag(block, "traTime2"), secondMessage),
     }];
+  }).sort((left, right) => {
+    const leftIndex = routeOrder.indexOf(left.routeName.replace(/\s+/g, ""));
+    const rightIndex = routeOrder.indexOf(right.routeName.replace(/\s+/g, ""));
+    return (leftIndex < 0 ? routeOrder.length : leftIndex) - (rightIndex < 0 ? routeOrder.length : rightIndex);
+  });
+}
+
+export function completeRouteArrivals(stops, arrivals) {
+  const byStopAndRoute = new Map(
+    (Array.isArray(arrivals) ? arrivals : []).map((arrival) => [
+      `${arrival.arsId}-${String(arrival.routeName || "").replace(/\s+/g, "")}`,
+      arrival,
+    ]),
+  );
+
+  return (Array.isArray(stops) ? stops : []).flatMap((stop) => {
+    const routes = normalizeRoutes(stop.routes);
+    if (!routes.length) {
+      return (Array.isArray(arrivals) ? arrivals : []).filter((arrival) => arrival.arsId === stop.arsId);
+    }
+    return routes.map((routeName) => byStopAndRoute.get(`${stop.arsId}-${routeName}`) || {
+      id: `${stop.arsId}-${routeName}`,
+      arsId: stop.arsId,
+      stationName: "",
+      routeName,
+      routeType: routeName.startsWith("성동") ? "2" : routeName.length <= 3 ? "3" : "4",
+      direction: stop.direction,
+      firstMessage: "현재 운행 정보 없음",
+      secondMessage: "다음 도착 정보 없음",
+      firstSeconds: null,
+      secondSeconds: null,
+    });
   });
 }

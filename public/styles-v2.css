@@ -222,11 +222,18 @@
   display: block;
   width: 340px;
   height: 205.5px;
-  background: var(--calla);
-  clip-path: inset(0 100% 0 0);
-  -webkit-mask: url("./assets/figma/gauge-track.svg") center / 340px 205.5px no-repeat;
-  mask: url("./assets/figma/gauge-track.svg") center / 340px 205.5px no-repeat;
-  will-change: clip-path;
+  overflow: visible;
+}
+
+.clock-gauge .gauge-progress path {
+  fill: none;
+  stroke: var(--calla);
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  will-change: stroke-dashoffset;
 }
 
 .clock-gauge .gauge-dot {
@@ -378,6 +385,21 @@
 .status-list dd { margin: 0; }
 .status-list dt { color: var(--dark-gray); font-size: 16px; font-weight: 400; line-height: 19px; letter-spacing: -0.32px; }
 .status-list dd { color: var(--ink); font-size: 20px; font-weight: 600; line-height: 24px; letter-spacing: -0.4px; text-align: right; }
+
+.status-day-off {
+  display: flex;
+  min-height: 122px;
+  margin: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.status-day-off[hidden] { display: none; }
+.status-day-off strong { color: var(--ink); font-size: 20px; font-weight: 600; line-height: 24px; letter-spacing: -0.4px; }
+.status-day-off span { color: var(--dark-gray); font-size: 15px; font-weight: 400; line-height: 20px; letter-spacing: -0.3px; }
 
 .design-v2 .transit-card {
   height: 541px;
@@ -590,6 +612,32 @@
   margin: 0;
   cursor: pointer;
   opacity: 0;
+}
+
+.display-input > input[type="date"]::-webkit-calendar-picker-indicator,
+.display-input > input[type="time"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.display-input:has(> input:focus) .display-value { opacity: 0; }
+.display-input > input:is([type="date"], [type="time"], [type="number"]):focus {
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--ink);
+  background: transparent;
+  opacity: 1;
+  font: inherit;
+  font-size: 26px;
+  line-height: 31px;
+  letter-spacing: -0.52px;
+  -webkit-text-fill-color: var(--ink);
 }
 
 .display-input:focus-within,
@@ -1086,7 +1134,7 @@
   .design-v2 .clock-card { height: 379px; min-height: 379px; }
   .clock-gauge { left: 12px; width: calc(100% - 24px); transform: none; }
   .clock-gauge .gauge-track { width: 100%; }
-  .clock-gauge .gauge-progress { width: 100%; -webkit-mask-size: 100% 205.5px; mask-size: 100% 205.5px; }
+  .clock-gauge .gauge-progress { width: 100%; }
   .design-v2 .clock-copy { left: 16px; width: calc(100% - 32px); }
   .design-v2 .clock-time { font-size: clamp(42px, 14vw, 56px); }
   .design-v2 .work-actions { left: 16px; width: calc(100% - 32px); }

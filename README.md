@@ -34,7 +34,7 @@ npm run dev
 
 Cloudflare Worker 프로젝트의 **Settings → Variables and Secrets**에서 아래 암호화 변수를 등록하세요.
 
-- `SEOUL_BUS_API_KEY` (필수): 공공데이터포털에서 발급받은 서울특별시 버스운행정보 공유서비스 일반 인증키
+- `SEOUL_BUS_API_KEY` (필수): 공공데이터포털의 `서울특별시_버스도착정보조회 서비스` 활용신청을 완료한 일반 인증키(Encoding 또는 Decoding)
 - `BUS_COMMUTE_STOPS_JSON` (선택): 출근길 정류소·노선 재정의
 - `BUS_HOME_STOPS_JSON` (선택): 퇴근길 정류소·노선 재정의
 
@@ -51,6 +51,8 @@ Cloudflare Worker 프로젝트의 **Settings → Variables and Secrets**에서 �
 ```
 
 기본값은 Figma에 표시된 출근길 `04540 / 성동10`, 퇴근길 `04210 / 302·2012·2222`입니다. 브라우저는 `/api/bus-arrivals`만 호출하므로 API 키가 클라이언트 코드에 노출되지 않습니다. API는 30초마다 다시 동기화하고, 화면의 분·초 카운트다운은 매초 갱신합니다.
+
+API가 `인증모듈 에러코드(20)`을 반환하면 변수 이름뿐 아니라 공공데이터포털의 해당 서비스 활용 상태가 `승인`인지 확인해야 합니다. 다른 공공데이터 서비스의 인증키는 같은 계정에서 발급했더라도 이 API에 사용할 수 없습니다.
 
 Workers Builds의 기본 배포 명령을 그대로 사용할 수 있습니다.
 

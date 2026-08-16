@@ -30,6 +30,24 @@
     return [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join("-");
   }
 
+  function isWeekend(date) {
+    return date instanceof Date && (date.getDay() === 0 || date.getDay() === 6);
+  }
+
+  function nextWorkdayStart(referenceDate, startTime, nonWorkingDateIds) {
+    var candidate = new Date(referenceDate);
+    var excluded = new Set(Array.isArray(nonWorkingDateIds) ? nonWorkingDateIds : []);
+    var startMinutes = parseClockTime(startTime);
+    candidate.setDate(candidate.getDate() + 1);
+    candidate.setHours(0, 0, 0, 0);
+    while (isWeekend(candidate) || excluded.has(localDateId(candidate))) {
+      candidate.setDate(candidate.getDate() + 1);
+    }
+    startMinutes = startMinutes === null ? 0 : startMinutes;
+    candidate.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
+    return candidate;
+  }
+
   function addMonths(date, months) {
     var result = new Date(date.getFullYear(), date.getMonth(), 1);
     result.setMonth(result.getMonth() + months);
@@ -209,7 +227,9 @@
     getEntitlement: getEntitlement,
     getVacationUnits: getVacationUnits,
     isChargeableVacation: isChargeableVacation,
+    isWeekend: isWeekend,
     localDateId: localDateId,
+    nextWorkdayStart: nextWorkdayStart,
     parseDateId: parseDateId,
     roundUnits: roundUnits
   };

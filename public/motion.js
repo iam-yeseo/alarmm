@@ -14,10 +14,13 @@ function gaugePosition(progress) {
   const gauge = document.querySelector(".clock-gauge");
   const width = gauge?.getBoundingClientRect().width || 340;
   const scaleX = width / 340;
-  const angle = Math.PI * (1 - progress);
+  const endpointAngle = Math.asin(30.5 / 165);
+  const startAngle = Math.PI + endpointAngle;
+  const endAngle = -endpointAngle;
+  const angle = startAngle + (endAngle - startAngle) * progress;
   return {
     x: (170 + 165 * Math.cos(angle)) * scaleX - 13,
-    y: 180 - 165 * Math.sin(angle) - 13,
+    y: 170 - 165 * Math.sin(angle) - 13,
   };
 }
 
@@ -27,16 +30,17 @@ function updateGauge(value) {
   if (!fill || !dot) return;
   const progress = Math.min(1, Math.max(0, Number(value) || 0));
   const position = gaugePosition(progress);
-  const clipPath = `inset(0 ${100 - progress * 100}% 0 0)`;
+  const strokeDashoffset = 1 - progress;
 
   if (reducedMotion) {
-    fill.style.clipPath = clipPath;
+    fill.style.strokeDashoffset = String(strokeDashoffset);
+    fill.style.opacity = progress > 0 ? "1" : "0";
     dot.style.transform = `translate3d(${position.x}px, ${position.y}px, 0)`;
     return;
   }
 
-  play(fill, { clipPath, duration: 920, ease: "linear" });
-  play(dot, { x: position.x, y: position.y, duration: 920, ease: "linear" });
+  play(fill, { strokeDashoffset, opacity: progress > 0 ? 1 : 0, duration: 780, ease: "linear" });
+  play(dot, { x: position.x, y: position.y, duration: 780, ease: "linear" });
 }
 
 function showLocalToast(message) {
@@ -194,6 +198,18 @@ function setupDisplayInputs() {
   document.querySelectorAll(".display-input input").forEach((input) => {
     syncControl(input);
     ["input", "change"].forEach((eventName) => input.addEventListener(eventName, () => syncControl(input)));
+    if (input.type === "date" || input.type === "time") {
+      const openPicker = () => {
+        if (input.disabled || typeof input.showPicker !== "function") return;
+        try { input.showPicker(); } catch (_error) { input.focus(); }
+      };
+      input.addEventListener("click", openPicker);
+      input.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        openPicker();
+      });
+    }
   });
 }
 

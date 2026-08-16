@@ -36,7 +36,9 @@
           <button class="clock-toggle" id="clockToggle" type="button" aria-describedby="clockHint">
             <span class="clock-gauge" aria-hidden="true">
               <img class="gauge-track" src="./assets/figma/gauge-track.svg" alt="" />
-              <span class="gauge-progress" id="arcDial"></span>
+              <svg class="gauge-progress" viewBox="0 0 340 205.501" preserveAspectRatio="none">
+                <path id="arcDial" pathLength="1" d="M7.81329 200.5C5.96598 190.615 5 180.421 5 170C5 78.873 78.873 5 170 5C261.127 5 335 78.873 335 170C335 180.421 334.034 190.615 332.187 200.5" />
+              </svg>
               <img class="gauge-dot" id="gaugeDot" src="./assets/figma/gauge-dot.svg" alt="" />
             </span>
             <span class="clock-copy">
@@ -57,11 +59,15 @@
             <span class="heading-icon"><img src="./assets/figma/icon-calendar.svg" alt="" /></span>
             <h2 id="statusTitle">오늘 현황</h2>
           </div>
-          <dl class="status-list">
+          <dl class="status-list" id="statusList">
             <div><dt>출근 시간</dt><dd id="statusStart">09:00:00</dd></div>
             <div><dt>점심 시간</dt><dd id="statusLunch">12:00 ~ 13:00</dd></div>
             <div><dt>퇴근 예정 시간</dt><dd id="statusEnd">18:00:00</dd></div>
           </dl>
+          <p class="status-day-off" id="statusDayOff" aria-live="polite" hidden>
+            <strong>오늘은 출근하는 날이 아니에요.</strong>
+            <span id="statusNextWork">다음 출근일을 확인하고 있어요.</span>
+          </p>
         </section>
 
         <section class="card transit-card" aria-labelledby="busTitle" data-reveal>
@@ -75,11 +81,7 @@
             <button class="compat-only" id="busModeButton" type="button">출근길 보기</button>
           </div>
           <div class="bus-list" id="busList" aria-live="polite" aria-busy="true">
-            <article class="bus-item"><div><small>성수SKV1센터1동 방면</small><strong class="bus-green">성동10</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
-            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-blue">302</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
-            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-lime">2012</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
-            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-lime">2022</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
-            <article class="bus-item"><div><small>광진광장 방면</small><strong class="bus-red">102</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
+            <article class="bus-item bus-message-item"><div><strong>실시간 도착정보 확인 중</strong><small>서울시 버스 정보를 불러오고 있어요.</small></div></article>
           </div>
           <button class="compat-only" id="busSettingsButton" type="button">버스 설정</button>
         </section>
