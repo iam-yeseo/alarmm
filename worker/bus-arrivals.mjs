@@ -1,8 +1,7 @@
 import {
   completeRouteArrivals,
   normalizeServiceKey,
-  parseBusXml,
-  parseStopConfig,
+  parseRouteArrivalXml,
 } from "../bus-api-core.mjs";
 
 const DEFAULT_STOPS = {
@@ -11,6 +10,53 @@ const DEFAULT_STOPS = {
   ],
   home: [
     { arsId: "04210", direction: "제인병원 방면", routes: ["302", "2012", "2222"] },
+  ],
+};
+
+const ROUTE_TARGETS = {
+  commute: [
+    {
+      arsId: "04540",
+      stationId: "103900298",
+      stationName: "성수역2번출구",
+      direction: "성수SKV1센터1동 방면",
+      routeName: "성동10",
+      routeType: "2",
+      busRouteId: "103900008",
+      ord: 19,
+    },
+  ],
+  home: [
+    {
+      arsId: "04210",
+      stationId: "103000111",
+      stationName: "성수2가3동주민센터",
+      direction: "제인병원 방면",
+      routeName: "302",
+      routeType: "3",
+      busRouteId: "100100052",
+      ord: 75,
+    },
+    {
+      arsId: "04210",
+      stationId: "103000111",
+      stationName: "성수2가3동주민센터",
+      direction: "제인병원 방면",
+      routeName: "2012",
+      routeType: "4",
+      busRouteId: "100100186",
+      ord: 71,
+    },
+    {
+      arsId: "04210",
+      stationId: "103000111",
+      stationName: "성수2가3동주민센터",
+      direction: "제인병원 방면",
+      routeName: "2222",
+      routeType: "4",
+      busRouteId: "100100199",
+      ord: 49,
+    },
   ],
 };
 
@@ -48,10 +94,12 @@ async function readTextWithinLimit(response, byteLimit) {
   return text + decoder.decode();
 }
 
-async function fetchStopArrivals(stop, apiKey) {
-  const url = new URL("http://ws.bus.go.kr/api/rest/stationinfo/getStationByUid");
+async function fetchRouteArrival(target, apiKey) {
+  const url = new URL("http://ws.bus.go.kr/api/rest/arrive/getArrInfoByRoute");
   url.searchParams.set("serviceKey", apiKey);
-  url.searchParams.set("arsId", stop.arsId);
+  url.searchParams.set("stId", target.stationId);
+  url.searchParams.set("busRouteId", target.busRouteId);
+  url.searchParams.set("ord", String(target.ord));
 
   const response = await fetch(url, {
     headers: { Accept: "application/xml" },
@@ -61,7 +109,7 @@ async function fetchStopArrivals(stop, apiKey) {
 
   const contentLength = Number(response.headers.get("content-length") || 0);
   if (contentLength > 2_000_000) throw new Error("서울시 버스 API 응답이 예상 크기를 초과했습니다.");
-  return parseBusXml(await readTextWithinLimit(response, 2_000_000), stop);
+  return parseRouteArrivalXml(await readTextWithinLimit(response, 2_000_000), target);
 }
 
 export async function onRequestGet(context) {
@@ -82,18 +130,22 @@ export async function onRequestGet(context) {
   }
 
   try {
-    const variableName = mode === "commute" ? "BUS_COMMUTE_STOPS_JSON" : "BUS_HOME_STOPS_JSON";
-    const stops = parseStopConfig(context.env[variableName], DEFAULT_STOPS[mode]);
-    const settled = await Promise.allSettled(stops.map((stop) => fetchStopArrivals(stop, apiKey)));
+    const stops = DEFAULT_STOPS[mode];
+    const targets = ROUTE_TARGETS[mode];
+    const settled = await Promise.allSettled(targets.map((target) => fetchRouteArrival(target, apiKey)));
     const arrivals = [];
     const failures = [];
 
     settled.forEach((result, index) => {
       if (result.status === "fulfilled") arrivals.push(...result.value);
-      else failures.push({ arsId: stops[index].arsId, message: String(result.reason?.message || result.reason) });
+      else failures.push({
+        arsId: targets[index].arsId,
+        routeName: targets[index].routeName,
+        message: String(result.reason?.message || result.reason),
+      });
     });
 
-    if (!arrivals.length && failures.length === stops.length) {
+    if (!arrivals.length && failures.length === targets.length) {
       console.error(JSON.stringify({ message: "all bus upstream requests failed", mode, failures }));
       const authenticationFailure = failures.find((failure) => /Key인증실패|SERVICE ACCESS DENIED|인증모듈|등록되지 않은 인증키/i.test(failure.message));
       return jsonResponse({

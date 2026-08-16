@@ -4,6 +4,7 @@ import {
   normalizeServiceKey,
   parseArrivalSeconds,
   parseBusXml,
+  parseRouteArrivalXml,
   parseStopConfig,
 } from "../bus-api-core.mjs";
 
@@ -37,10 +38,41 @@ const completed = completeRouteArrivals(
 assert.deepEqual(completed.map((arrival) => arrival.routeName), ["302", "2012", "2222"], "세 개 퇴근 노선을 항상 노출한다");
 assert.equal(completed[2].firstMessage, "현재 운행 정보 없음", "도착 응답이 없는 노선은 운행 상태를 표시한다");
 
+const routeArrival = parseRouteArrivalXml(`<?xml version="1.0"?><ServiceResult><msgHeader><headerCd>0</headerCd></msgHeader><msgBody>
+<itemList><arsId>04210</arsId><stId>103000111</stId><stNm>성수2가3동주민센터</stNm><rtNm>302</rtNm><routeType>3</routeType><dir>성동세무서</dir><traTime1>150</traTime1><traTime2>430</traTime2><arrmsg1>2분 30초후</arrmsg1><arrmsg2>7분 10초후</arrmsg2></itemList>
+</msgBody></ServiceResult>`, {
+  arsId: "04210",
+  stationName: "성수2가3동주민센터",
+  routeName: "302",
+  routeType: "3",
+  direction: "제인병원 방면",
+});
+assert.equal(routeArrival.length, 1, "노선별 도착정보 응답을 한 개의 화면 항목으로 변환한다");
+assert.equal(routeArrival[0].routeName, "302", "노선명을 유지한다");
+assert.equal(routeArrival[0].direction, "제인병원 방면", "화면에 지정한 방면 문구를 우선한다");
+assert.equal(routeArrival[0].firstSeconds, 150, "노선별 첫 버스 도착 초를 변환한다");
+assert.equal(routeArrival[0].secondSeconds, 430, "노선별 두 번째 버스 도착 초를 변환한다");
+assert.deepEqual(
+  parseRouteArrivalXml("<ServiceResult><msgHeader><headerCd>0</headerCd></msgHeader><msgBody /></ServiceResult>", {
+    arsId: "04210",
+    stationName: "성수2가3동주민센터",
+    routeName: "302",
+    routeType: "3",
+    direction: "제인병원 방면",
+  }),
+  [],
+  "도착 항목이 없는 정상 응답은 빈 배열로 처리한다",
+);
+
 assert.throws(
   () => parseBusXml("<OpenAPI_ServiceResponse><cmmMsgHeader><returnReasonCode>20</returnReasonCode><returnAuthMsg>SERVICE ACCESS DENIED ERROR.</returnAuthMsg></cmmMsgHeader></OpenAPI_ServiceResponse>", { arsId: "04540", routes: [] }),
   /SERVICE ACCESS DENIED/,
   "공공데이터포털 인증 오류 형식도 감지한다",
+);
+assert.throws(
+  () => parseRouteArrivalXml("<OpenAPI_ServiceResponse><cmmMsgHeader><returnReasonCode>20</returnReasonCode><returnAuthMsg>SERVICE ACCESS DENIED ERROR.</returnAuthMsg></cmmMsgHeader></OpenAPI_ServiceResponse>", { arsId: "04540", routeName: "성동10" }),
+  /SERVICE ACCESS DENIED/,
+  "노선별 조회에서도 공공데이터포털 인증 오류를 감지한다",
 );
 
 const fallback = [{ arsId: "04210", direction: "제인병원 방면", routes: ["302"] }];
@@ -52,4 +84,4 @@ assert.deepEqual(
 );
 assert.throws(() => parseStopConfig('[{"arsId":"12"}]', fallback), /5자리/, "잘못된 정류소 번호를 거부한다");
 
-console.log("bus-api-core: 16 assertions passed");
+console.log("bus-api-core: passed");
