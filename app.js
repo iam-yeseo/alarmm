@@ -21,10 +21,11 @@
     overtimeEnabled: false,
     overtimeEndTime: "20:00",
     includeOvertimeInProgress: true,
+    freeWorkEnabled: false,
     hireDate: "",
     birthday: "",
     allowVacationAdvance: false,
-    expireUnusedVacation: true
+    expireUnusedVacation: false
   };
 
   var $ = function (id) {
@@ -293,6 +294,18 @@
     return date.getFullYear() + "." + pad(date.getMonth() + 1) + "." + pad(date.getDate());
   }
 
+  function formatDateKorean(dateId) {
+    var date = core.parseDateId(dateId);
+    if (!date) return "—";
+    return date.getFullYear() + "년 " + (date.getMonth() + 1) + "월 " + date.getDate() + "일";
+  }
+
+  function formatDateInput(dateId) {
+    var date = core.parseDateId(dateId);
+    if (!date) return "0000. 00. 00.";
+    return date.getFullYear() + ". " + pad(date.getMonth() + 1) + ". " + pad(date.getDate()) + ".";
+  }
+
   function formatDateLong(dateId) {
     var date = core.parseDateId(dateId);
     if (!date) return "";
@@ -549,6 +562,14 @@
       $("timelineLunchWrap").hidden = isLeaveDay || !schedule.lunchEnabled;
       $("lunchStartMarker").hidden = isLeaveDay || !schedule.lunchEnabled;
       $("lunchEndMarker").hidden = isLeaveDay || !schedule.lunchEnabled;
+
+      if ($("statusStart")) {
+        $("statusStart").textContent = isLeaveDay ? "휴가" : formatTimeFromDate(schedule.start) + ":00";
+        $("statusLunch").textContent = schedule.lunchEnabled
+          ? settings.lunchStart + " ~ " + settings.lunchEnd
+          : "없음";
+        $("statusEnd").textContent = isLeaveDay ? "휴가" : formatTimeFromDate(schedule.countdownEnd) + ":00";
+      }
 
       if (vacation) $("attendanceMessage").textContent = "오늘은 " + getVacationLabel(vacation, settings) + " 사용일이에요.";
       renderWorkState(state, schedule, vacation);
@@ -868,6 +889,7 @@
       overtimeEnabled: $("overtimeEnabled"),
       overtimeEndTime: $("overtimeEndTime"),
       includeOvertimeInProgress: $("includeOvertimeInProgress"),
+      freeWorkEnabled: $("freeWorkEnabled"),
       hireDate: $("hireDate"),
       birthday: $("birthday"),
       allowVacationAdvance: $("allowVacationAdvance"),
@@ -880,6 +902,8 @@
     });
     fields.hireDate.max = localDateId(new Date());
     fields.birthday.max = localDateId(new Date());
+    var noFixedLunch = $("noFixedLunch");
+    noFixedLunch.checked = !fields.lunchEnabled.checked;
 
     function readForm() {
       return {
@@ -893,6 +917,7 @@
         overtimeEnabled: fields.overtimeEnabled.checked,
         overtimeEndTime: fields.overtimeEndTime.value,
         includeOvertimeInProgress: fields.includeOvertimeInProgress.checked,
+        freeWorkEnabled: fields.freeWorkEnabled.checked,
         hireDate: fields.hireDate.value,
         birthday: fields.birthday.value,
         allowVacationAdvance: fields.allowVacationAdvance.checked,
@@ -910,10 +935,12 @@
 
     function setDisabledStates() {
       var lunchDisabled = !fields.lunchEnabled.checked;
+      noFixedLunch.checked = lunchDisabled;
       [fields.lunchStart, fields.lunchEnd, fields.lunchMinutes].forEach(function (field) {
         field.disabled = lunchDisabled;
       });
       $("lunchFields").classList.toggle("is-disabled", lunchDisabled);
+      $("workSettingsCard").classList.toggle("is-free-work", fields.freeWorkEnabled.checked);
 
       var overtimeDisabled = !fields.overtimeEnabled.checked;
       [fields.overtimeEndTime, fields.includeOvertimeInProgress].forEach(function (field) {
@@ -970,7 +997,7 @@
 
     function renderVacationSettings(value) {
       if (!value.hireDate) {
-        $("vacationSettingsNote").textContent = "입사일을 입력하면 법정 발생 기준을 확인할 수 있어요.";
+        $("vacationSettingsNote").textContent = "입사일자를 선택하면 휴가일수가 자동 계산되어 적용됩니다.";
         return;
       }
       var balance = core.calculateBalance(value.hireDate, loadVacations(), localDateId(new Date()));
@@ -993,11 +1020,8 @@
         overtimeMinutes = Math.max(0, overtimeEndOffset - normalEndOffset);
       }
 
-      $("workDurationNote").textContent =
-        "휴식 제외 기준 " + formatDuration(regularMinutes) + " 근무예요.";
-      $("lunchDurationNote").textContent = value.lunchEnabled
-        ? value.lunchStart + "부터 " + value.lunchEnd + "까지, 총 " + value.lunchMinutes + "분이에요."
-        : "점심시간을 사용하지 않아요.";
+      $("workDurationNote").textContent = "점심시간을 제외한 하루 총 근무시간을 입력해주세요.";
+      $("lunchDurationNote").textContent = "총 점심 시간을 입력해주세요. 근로계약서 상 휴게 시간입니다.";
       $("overtimeDurationNote").textContent = value.overtimeEnabled
         ? "정규 퇴근 후 " + formatDuration(overtimeMinutes) + " 야근 예정이에요."
         : "야근을 사용하지 않아요.";
@@ -1013,6 +1037,12 @@
     }
 
     fields.lunchEnabled.addEventListener("change", function () {
+      setDisabledStates();
+      updateEndFromWorkHours();
+      renderSummary();
+    });
+    noFixedLunch.addEventListener("change", function () {
+      fields.lunchEnabled.checked = !noFixedLunch.checked;
       setDisabledStates();
       updateEndFromWorkHours();
       renderSummary();
@@ -1039,6 +1069,7 @@
       fields.workHours,
       fields.overtimeEndTime,
       fields.includeOvertimeInProgress,
+      fields.freeWorkEnabled,
       fields.hireDate,
       fields.birthday,
       fields.allowVacationAdvance,
@@ -1049,6 +1080,18 @@
         renderSummary();
       });
     });
+
+    var autoSaveTimer = 0;
+    function scheduleAutoSave() {
+      window.clearTimeout(autoSaveTimer);
+      autoSaveTimer = window.setTimeout(function () {
+        var value = readForm();
+        if (validate(value)) return;
+        if (saveJson(SETTINGS_KEY, value)) settings = value;
+      }, 240);
+    }
+    form.addEventListener("input", scheduleAutoSave);
+    form.addEventListener("change", scheduleAutoSave);
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
@@ -1088,9 +1131,7 @@
     var todayId = localDateId(new Date());
 
     dateField.min = todayId;
-    dateField.value = todayId;
     endDateField.min = todayId;
-    endDateField.value = todayId;
 
     function selectedType() {
       var selected = form.querySelector('input[name="vacationType"]:checked');
@@ -1139,9 +1180,9 @@
     }
 
     function formatVacationRange() {
-      if (!dateField.value) return "날짜 입력하기";
-      var start = formatDateShort(dateField.value);
-      var end = formatDateShort(endDateField.value || dateField.value);
+      if (!dateField.value) return "0000. 00. 00.";
+      var start = formatDateInput(dateField.value);
+      var end = formatDateInput(endDateField.value || dateField.value);
       return start === end ? start : start + " — " + end;
     }
 
@@ -1159,7 +1200,7 @@
       $("advanceBadge").hidden = !settings.allowVacationAdvance;
 
       if (!hasHireDate) {
-        $("balanceLabel").textContent = "현재 사용 가능";
+        $("balanceLabel").textContent = "남은 휴가일수";
         $("balanceTitle").textContent = "입사일을 입력해주세요";
         $("balanceKind").textContent = "휴가";
         $("balanceValue").textContent = "—";
@@ -1167,12 +1208,13 @@
         $("usedValue").textContent = "—";
         $("plannedValue").textContent = "—";
         $("expiryValue").textContent = "—";
-        $("nextGrantText").textContent = "설정에서 입사일을 먼저 저장해주세요.";
+        $("nextGrantText").textContent = "—";
+        if ($("vacationHistoryNote")) $("vacationHistoryNote").textContent = "입사일 이후의 기록이에요.";
         return;
       }
 
       var balance = core.calculateBalance(settings.hireDate, vacations, todayId);
-      $("balanceLabel").textContent = balance.remaining < 0 ? "당겨쓴 잔여" : "잔여";
+      $("balanceLabel").textContent = balance.remaining < 0 ? "당겨쓴 휴가일수" : "남은 휴가일수";
       $("balanceTitle").textContent = balance.label + " 잔여";
       $("balanceKind").textContent = balance.label;
       $("balanceValue").textContent = formatUnits(balance.remaining);
@@ -1183,16 +1225,14 @@
         return vacation.date >= todayId ? total + core.getVacationUnits(vacation) : total;
       }, 0);
       $("plannedValue").textContent = formatUnits(plannedUnits) + "일";
-      $("expiryValue").textContent = formatDateShort(dateIdBefore(balance.periodEnd));
+      $("expiryValue").textContent = formatDateKorean(dateIdBefore(balance.periodEnd));
       $("fullVacationLabel").textContent = balance.label + " 1일";
+      if ($("vacationHistoryNote")) {
+        $("vacationHistoryNote").textContent = "이 기록은 " + formatDateKorean(balance.periodStart) + " 이후 기록이에요.";
+      }
 
       if (balance.nextGrantDate) {
-        var nextGrant = core.parseDateId(balance.nextGrantDate);
-        var todayDate = core.parseDateId(todayId);
-        var daysUntilGrant = nextGrant && todayDate ? Math.max(0, Math.ceil((nextGrant - todayDate) / (24 * 60 * 60 * 1000))) : 0;
-        $("nextGrantText").textContent = balance.serviceYears === 0
-          ? daysUntilGrant + "일 후"
-          : formatDateShort(balance.nextGrantDate);
+        $("nextGrantText").textContent = formatDateKorean(balance.nextGrantDate);
       } else {
         $("nextGrantText").textContent = "첫 입사기념일까지 사용할 수 있어요.";
       }
@@ -1260,7 +1300,8 @@
         return String(b.date || "").localeCompare(String(a.date || "")) ||
           String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
       });
-      $("vacationCount").textContent = vacations.length + "개";
+      var plannedCount = vacations.filter(function (vacation) { return vacation.date >= todayId; }).length;
+      $("vacationCount").textContent = plannedCount + "개 사용 예정";
       list.innerHTML = "";
 
       if (!sorted.length) {
@@ -1271,7 +1312,7 @@
         return;
       }
 
-      sorted.forEach(function (vacation) {
+      sorted.slice(0, 3).forEach(function (vacation) {
         var article = document.createElement("article");
         article.className = "vacation-item";
         var header = document.createElement("div");
@@ -1279,13 +1320,14 @@
         var titleWrap = document.createElement("div");
         var date = document.createElement("time");
         date.dateTime = vacation.date;
-        date.textContent = formatDateLong(vacation.date);
+        date.textContent = formatDateKorean(vacation.date);
         var title = document.createElement("h3");
         title.textContent = getVacationLabel(vacation, settings);
         titleWrap.append(date, title);
         var status = document.createElement("span");
         status.className = "vacation-status";
         status.textContent = vacation.date < todayId ? "사용 완료" : vacation.date === todayId ? "오늘" : "신청 완료";
+        if (vacation.date < todayId) status.classList.add("complete");
         header.append(titleWrap, status);
 
         var detail = document.createElement("p");

@@ -3,36 +3,76 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#fafafa" />
-    <meta name="description" content="Alarmm에서 월차, 연차, 반차와 비차감 휴가를 계산하고 신청하세요." />
-    <title>Alarmm · Vacation</title>
-    <link rel="icon" href="./assets/user.svg" />
+    <meta name="theme-color" content="#f0f0f0" />
+    <meta name="description" content="Calla에서 잔여 휴가를 확인하고 휴가를 신청하세요." />
+    <title>Calla · Vacation</title>
+    <link rel="icon" href="./assets/figma/calla-logo.svg" />
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./styles-v2.css" />
   </head>
   <body class="design-v2" data-page="vacation">
     <div class="app-shell">
-      <header class="sub-header"><a href="./index.html" aria-label="홈으로 돌아가기"><img src="./assets/back.svg" alt="" /></a><h1>휴가 신청하기</h1></header>
+      <header class="topbar" data-page-enter>
+        <h1>휴가 관리</h1>
+        <nav class="top-actions" aria-label="페이지 메뉴">
+          <a class="icon-link" href="./vacation.html" aria-label="휴가 관리" aria-current="page"><img src="./assets/figma/icon-vacation.svg" alt="" width="24" height="24" /></a>
+          <a class="icon-link" href="./settings.html" aria-label="설정" data-page-link><img src="./assets/figma/icon-settings.svg" alt="" width="24" height="24" /></a>
+        </nav>
+      </header>
 
       <main class="page-content vacation-content">
-        <section class="vacation-balance-grid" aria-labelledby="balanceTitle">
-          <article class="balance-tile remaining"><p id="balanceLabel">잔여</p><p class="sr-only" id="balanceTitle">잔여 휴가</p><h2><strong id="balanceValue">—</strong><span>일</span></h2><span class="sr-only" id="balanceKind">휴가</span></article>
-          <article class="balance-tile used"><p>사용</p><h2><strong id="usedValue">—</strong><span>일</span></h2></article>
-        </section>
-        <section class="card balance-detail-card">
-          <div><span>사용 예정</span><strong id="plannedValue">0일</strong></div>
-          <div><span>소멸 예정일</span><strong id="expiryValue">—</strong></div>
-          <div><span>다음 월차 발생일</span><strong id="nextGrantText">입사일을 설정해주세요.</strong></div>
-          <span class="sr-only" id="grantedValue">—</span>
+        <section class="vacation-balance-grid" aria-labelledby="balanceTitle" data-hero>
+          <article class="balance-tile remaining">
+            <p id="balanceLabel">남은 휴가일수</p><p class="sr-only" id="balanceTitle">남은 휴가</p>
+            <h2><strong id="balanceValue" data-count-value>15</strong><span>일</span></h2><span class="sr-only" id="balanceKind">휴가</span>
+          </article>
+          <article class="balance-tile used"><p>사용한 휴가</p><h2><strong id="usedValue" data-count-value>15</strong><span>일</span></h2></article>
         </section>
 
-        <a class="setup-vacation-card" id="vacationSetupPrompt" href="./settings.html"><span><strong>입사일 설정이 필요해요.</strong><small>설정에서 입사일을 저장하면 신청할 수 있어요.</small></span><b aria-hidden="true">→</b></a>
+        <section class="card balance-detail-card" data-hero>
+          <div><span>휴가 소멸 예정일</span><strong id="expiryValue">2027년 2월 22일</strong></div>
+          <div><span>다음 월차 발생일</span><strong id="nextGrantText">2026년 8월 22일</strong></div>
+          <span class="sr-only" id="plannedValue">0일</span><span class="sr-only" id="grantedValue">—</span>
+        </section>
 
-        <form class="card vacation-apply-card" id="vacationForm" novalidate>
-          <div class="vacation-form-heading"><h2>휴가 신청하기</h2><p>휴가 시작일을 입력해주세요.</p><span class="mini-badge" id="advanceBadge" hidden>당겨쓰기 가능</span></div>
-          <button class="vacation-date-open" id="vacationOpenButton" type="button"><span id="vacationDateDisplay">날짜 입력하기</span></button>
+        <a class="compat-only" id="vacationSetupPrompt" href="./settings.html"><span>입사일 설정이 필요해요.</span></a>
+
+        <form class="card vacation-apply-card" id="vacationForm" novalidate data-reveal>
+          <div class="vacation-form-heading"><h2>휴가 신청하기</h2><span class="mini-badge" id="advanceBadge" hidden>당겨쓰기 가능</span></div>
+          <div class="input-block vacation-date-block">
+            <span class="control-label">휴가 시작일</span>
+            <button class="display-input vacation-date-open" id="vacationOpenButton" type="button"><span id="vacationDateDisplay">0000. 00. 00.</span></button>
+            <p class="field-note">휴가 시작일을 입력해주세요.</p>
+          </div>
+          <div class="segmented-control day-segments" role="group" aria-label="휴가 시간 단위">
+            <button class="selected" type="button" data-period-choice="day">종일</button>
+            <button type="button" data-period-choice="am">오전</button>
+            <button type="button" data-period-choice="pm">오후</button>
+            <button type="button" data-period-choice="qam">시간</button>
+          </div>
+          <div class="input-block vacation-time-block">
+            <label class="line-control time-control">
+              <span class="control-label">시작 시각 입력</span>
+              <span class="display-input split-display">
+                <span class="display-value"><b data-time-hour="vacationStartTime">00</b>시</span>
+                <span class="display-value"><b data-time-minute="vacationStartTime">00</b>분</span>
+                <input id="vacationStartTime" type="time" />
+              </span>
+            </label>
+            <p class="field-note">휴가 시작 시각을 입력해주세요.</p>
+          </div>
+          <label class="check-control non-charge-check">
+            <input id="vacationNonCharge" type="checkbox" />
+            <span class="check-box" aria-hidden="true"><img src="./assets/figma/checkmark.svg" alt="" /></span>
+            <span>연차 차감 제외 휴가예요.</span>
+          </label>
+          <div class="segmented-control reason-segments" role="group" aria-label="차감 제외 휴가 종류">
+            <button class="selected" type="button" data-special-choice="health">보건</button>
+            <button type="button" data-special-choice="bereavement">경조사</button>
+            <button type="button" data-special-choice="other">기타</button>
+          </div>
           <p class="form-error vacation-form-error" id="vacationFormError" role="alert"></p>
-          <button class="save-button" id="vacationNextButton" type="button">다음</button>
+          <button class="primary-button" id="vacationNextButton" type="button">계속하기</button>
 
           <div class="sheet-backdrop" id="vacationFlowDialog" hidden>
             <section class="bottom-sheet date-sheet" id="vacationDateSheet" role="dialog" aria-modal="true" aria-labelledby="vacationDateSheetTitle">
@@ -40,46 +80,42 @@
               <h2 id="vacationDateSheetTitle">날짜 지정하기</h2><p>휴가 시작일과 종료일을 입력해주세요.</p>
               <label class="sheet-date-field"><span>시작일</span><input id="vacationDate" name="vacationDate" type="date" required /><select id="vacationStartPeriod" aria-label="시작일 휴가 단위"><option value="day">전일</option><option value="am">오전</option><option value="pm">오후</option><option value="qam">오전 반반차</option><option value="qpm">오후 반반차</option></select></label>
               <label class="sheet-date-field"><span>종료일</span><input id="vacationEndDate" name="vacationEndDate" type="date" required /><select id="vacationEndPeriod" aria-label="종료일 휴가 단위"><option value="day">전일</option><option value="am">오전</option><option value="pm">오후</option><option value="qam">오전 반반차</option><option value="qpm">오후 반반차</option></select></label>
-              <button class="save-button" id="vacationDateNext" type="button">휴가 옵션 선택하기</button>
+              <button class="primary-button" id="vacationDateNext" type="button">휴가 옵션 선택하기</button>
             </section>
 
             <section class="bottom-sheet option-sheet" id="vacationOptionSheet" role="dialog" aria-modal="true" aria-labelledby="vacationOptionSheetTitle" hidden>
-              <button class="sheet-close" id="vacationOptionBack" type="button" aria-label="날짜 선택으로 돌아가기">‹</button>
+              <button class="sheet-close sheet-back" id="vacationOptionBack" type="button" aria-label="날짜 선택으로 돌아가기">‹</button>
               <h2 id="vacationOptionSheetTitle">휴가 옵션 선택</h2><p>해당되는 사항을 선택해주세요.</p>
               <div class="special-options">
-                <label class="special-row"><span><strong>보건 휴가 여부</strong><small>아프면 무료로 쉴 수 있어요.</small></span><input type="radio" name="vacationType" value="health" /></label>
-                <label class="special-row"><span><strong>경조사 휴가 여부</strong><small>기쁘고 슬픈 일은 무료로 나눠야 해요.</small></span><input type="radio" name="vacationType" value="bereavement" /></label>
-                <label class="special-row"><span><strong>기타 미차감 휴가 여부</strong><small>잔여 휴가 개수에서 차감되지 않아요.</small></span><input type="radio" name="vacationType" value="other" /></label>
-                <label class="special-row"><span><strong>일반 연차·월차</strong><small>선택한 날짜와 시간만큼 잔여 휴가에서 차감돼요.</small></span><input type="radio" name="vacationType" value="full" checked /></label>
-                <label class="special-row warning-row"><span><strong>허가 받지 않은 휴가 여부</strong><small>권고사직 사유가 될 수 있어요.</small></span><input id="vacationUnauthorized" type="checkbox" /></label>
+                <label class="special-row"><span><strong>보건 휴가</strong><small>잔여 휴가에서 차감하지 않아요.</small></span><input type="radio" name="vacationType" value="health" /></label>
+                <label class="special-row"><span><strong>경조사 휴가</strong><small>잔여 휴가에서 차감하지 않아요.</small></span><input type="radio" name="vacationType" value="bereavement" /></label>
+                <label class="special-row"><span><strong>기타 미차감 휴가</strong><small>잔여 휴가에서 차감하지 않아요.</small></span><input type="radio" name="vacationType" value="other" /></label>
+                <label class="special-row"><span><strong>일반 연차·월차</strong><small>선택한 날짜만큼 잔여 휴가에서 차감돼요.</small></span><input type="radio" name="vacationType" value="full" checked /></label>
+                <label class="special-row warning-row"><span><strong>허가 받지 않은 휴가</strong><small>권고사직 사유가 될 수 있어요.</small></span><input id="vacationUnauthorized" type="checkbox" /></label>
               </div>
               <fieldset class="vacation-period-fieldset" id="vacationPeriodFields" hidden><legend>사용 시간대</legend><div class="period-segment"><label><input type="radio" name="vacationPeriod" value="am" checked /><span>오전</span></label><label><input type="radio" name="vacationPeriod" value="pm" /><span>오후</span></label></div><p id="vacationSchedulePreview">휴가에 맞춰 출퇴근 시각을 계산해드려요.</p></fieldset>
               <label class="field-control vacation-memo-field"><span>메모 <em>선택</em></span><input id="vacationMemo" name="vacationMemo" type="text" maxlength="60" placeholder="필요한 내용을 남겨주세요" /></label>
               <span class="sr-only" id="fullVacationLabel">연차 1일</span>
-              <button class="save-button" id="vacationSubmit" type="submit">휴가 신청하기</button>
+              <button class="primary-button" id="vacationSubmit" type="submit">휴가 신청하기</button>
             </section>
           </div>
         </form>
 
-        <section class="card vacation-history-card" aria-labelledby="vacationHistoryTitle">
-          <div class="card-heading-row"><h2 id="vacationHistoryTitle">휴가 내역</h2><span class="mini-badge" id="vacationCount">0개</span></div>
+        <section class="card vacation-history-card" aria-labelledby="vacationHistoryTitle" data-reveal>
+          <div class="card-heading-row"><h2 id="vacationHistoryTitle">휴가 사용내역</h2><span class="history-count" id="vacationCount">0개 사용 예정</span></div>
           <div class="vacation-list" id="vacationList"></div>
+          <p class="history-note" id="vacationHistoryNote">입사일 이후의 기록이에요.</p>
         </section>
 
-        <section class="card vacation-rules-card" aria-labelledby="vacationRulesTitle">
+        <section class="vacation-rules-card" aria-labelledby="vacationRulesTitle" data-reveal>
           <h2 id="vacationRulesTitle">계산 기준</h2>
           <ul><li>1년 미만은 1개월 개근할 때마다 1일, 최대 11일이 발생해요.</li><li>1년간 80% 이상 출근하면 15일, 3년차부터 2년마다 1일이 늘어나며 최대 25일이에요.</li><li>1년 미만 발생분은 첫 입사기념일까지, 이후 연차는 발생일부터 1년간 계산해요.</li><li>월 개근과 연 80% 출근을 충족한 것으로 계산해요.</li><li>반차·반반차와 보건·경조 휴가는 회사 규칙을 함께 확인해주세요.</li></ul>
         </section>
       </main>
-
-      <nav class="bottom-nav" aria-label="주요 메뉴">
-        <a class="nav-item" href="./index.html"><img src="./assets/nav-home.svg" alt="" /><span>HOME</span></a>
-        <a class="nav-item active" href="./vacation.html" aria-current="page"><img src="./assets/nav-vacation-active.svg" alt="" /><span>VACATION</span></a>
-        <a class="nav-item" href="./calendar.html"><img src="./assets/nav-personal.svg" alt="" /><span>PERSONAL</span></a>
-        <a class="nav-item" href="./settings.html"><img src="./assets/nav-settings.svg" alt="" /><span>SETTINGS</span></a>
-      </nav>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./vacation-core.js" defer></script><script src="./app.js" defer></script>
+    <script src="./vacation-core.js" defer></script>
+    <script src="./app.js" defer></script>
+    <script type="module" src="./motion.js"></script>
   </body>
 </html>

@@ -3,32 +3,42 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#fafafa" />
-    <meta name="description" content="Alarmm으로 현재 시각과 퇴근까지 남은 시간을 한눈에 확인하세요." />
-    <title>Alarmm · Home</title>
-    <link rel="icon" href="./assets/user.svg" />
+    <meta name="theme-color" content="#f0f0f0" />
+    <meta name="description" content="Calla에서 현재 시각과 오늘의 근무 현황을 확인하세요." />
+    <title>Calla · Home</title>
+    <link rel="icon" href="./assets/figma/calla-logo.svg" />
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./styles-v2.css" />
   </head>
   <body class="design-v2" data-page="home">
     <div class="app-shell">
-      <header class="brand-header">
-        <img class="brand-logo" src="./assets/calla-logo.svg" alt="calla" width="78" height="28" />
-        <a class="brand-user" href="./settings.html" aria-label="설정 열기"><img src="./assets/user.svg" alt="" width="32" height="32" /></a>
-        <p class="sr-only" id="attendanceMessage">오늘도 반가워요, Alarmm</p>
+      <header class="topbar topbar-home" data-page-enter>
+        <a class="logo-link" href="./index.html" aria-label="Calla 홈">
+          <img src="./assets/figma/calla-logo.svg" alt="calla" width="83" height="30" />
+        </a>
+        <nav class="top-actions" aria-label="페이지 메뉴">
+          <a class="icon-link" href="./vacation.html" aria-label="휴가 관리" data-page-link>
+            <img src="./assets/figma/icon-vacation.svg" alt="" width="24" height="24" />
+          </a>
+          <a class="icon-link" href="./settings.html" aria-label="설정" data-page-link>
+            <img src="./assets/figma/icon-settings.svg" alt="" width="24" height="24" />
+          </a>
+        </nav>
+        <p class="sr-only" id="attendanceMessage">오늘도 반가워요, Calla</p>
       </header>
 
       <main class="page-content home-content">
-        <section class="week-strip" aria-label="이번 주 날짜"><ol id="weekCalendar" class="week-list"></ol></section>
-
-        <a class="today-vacation-banner" id="todayVacationBanner" href="./vacation.html" hidden>
-          <span><small>오늘의 휴가</small><strong id="todayVacationTitle">휴가 사용일</strong></span>
-          <em id="todayVacationSchedule">출퇴근 일정 확인</em>
+        <a class="compat-only" id="todayVacationBanner" href="./vacation.html" hidden>
+          <span id="todayVacationTitle"></span><span id="todayVacationSchedule"></span>
         </a>
 
-        <section class="card clock-card" aria-labelledby="clockLabel">
-          <button class="clock-toggle" id="clockToggle" type="button">
-            <span class="arc-gauge" aria-hidden="true"><span class="arc-dial" id="arcDial"></span></span>
+        <section class="card clock-card hero-card" aria-labelledby="clockLabel" data-hero>
+          <button class="clock-toggle" id="clockToggle" type="button" aria-describedby="clockHint">
+            <span class="clock-gauge" aria-hidden="true">
+              <img class="gauge-track" src="./assets/figma/gauge-track.svg" alt="" />
+              <span class="gauge-progress" id="arcDial"><img src="./assets/figma/gauge-progress.svg" alt="" /></span>
+              <img class="gauge-dot" src="./assets/figma/gauge-dot.svg" alt="" />
+            </span>
             <span class="clock-copy">
               <span class="clock-label" id="clockLabel">현재 시각</span>
               <strong class="clock-time" id="clockTime">00:00:00</strong>
@@ -36,52 +46,73 @@
             </span>
           </button>
           <div class="work-actions">
-            <button class="work-state" id="workStateButton" type="button" disabled><span class="work-state-label" id="workStateLabel">시간 계산 중</span></button>
-            <button class="checkout-button" id="checkoutButton" type="button" hidden>퇴근하기</button>
+            <button class="primary-button work-state" id="workStateButton" type="button" disabled><span class="work-state-label" id="workStateLabel">시간 계산 중</span></button>
+            <button class="primary-button checkout-button" id="checkoutButton" type="button" hidden>퇴근하기</button>
           </div>
-          <p class="interaction-hint">시간을 클릭하면 보기 방식을 바꿀 수 있어요.</p>
+          <p class="interaction-hint" id="clockHint">시간을 클릭하면 보기 방식을 바꿀 수 있어요.</p>
         </section>
 
-        <section class="card progress-card" aria-labelledby="progressTitle">
-          <div class="card-heading-row"><h2 id="progressTitle">오늘 진행률</h2><strong id="progressPercent">0%</strong></div>
-          <div class="day-timeline" aria-hidden="true"><span class="timeline-fill" id="timelineFill"></span><span class="timeline-marker lunch-start" id="lunchStartMarker"></span><span class="timeline-marker lunch-end" id="lunchEndMarker"></span></div>
-          <div class="timeline-labels">
-            <span><small>출근</small><strong id="timelineStart">09:00</strong></span>
-            <span class="timeline-lunch-label" id="timelineLunchWrap"><small>점심</small><strong id="timelineLunch">12:00–13:00</strong></span>
-            <span><small id="timelineEndLabel">퇴근</small><strong id="timelineEnd">18:00</strong></span>
+        <section class="card status-card" aria-labelledby="statusTitle" data-reveal>
+          <div class="section-heading">
+            <span class="heading-icon"><img src="./assets/figma/icon-calendar.svg" alt="" /></span>
+            <h2 id="statusTitle">오늘 현황</h2>
           </div>
+          <dl class="status-list">
+            <div><dt>출근 시간</dt><dd id="statusStart">09:00:00</dd></div>
+            <div><dt>점심 시간</dt><dd id="statusLunch">12:00 ~ 13:00</dd></div>
+            <div><dt>퇴근 예정 시간</dt><dd id="statusEnd">18:00:00</dd></div>
+          </dl>
         </section>
 
-        <section class="card bus-card" aria-labelledby="busTitle">
-          <div class="card-heading-row"><h2 id="busTitle">퇴근길 미리보기</h2><button class="mini-filter" id="busModeButton" type="button">출근길 보기</button></div>
+        <section class="card transit-card" aria-labelledby="busTitle" data-reveal>
+          <div class="section-heading">
+            <span class="heading-icon bus-icon" aria-hidden="true">
+              <img class="bus-body" src="./assets/figma/icon-bus-body.svg" alt="" />
+              <img class="bus-wheel bus-wheel-left" src="./assets/figma/icon-bus-wheel-left.svg" alt="" />
+              <img class="bus-wheel bus-wheel-right" src="./assets/figma/icon-bus-wheel-right.svg" alt="" />
+            </span>
+            <h2 id="busTitle">퇴근길 버스</h2>
+            <button class="compat-only" id="busModeButton" type="button">출근길 보기</button>
+          </div>
           <div class="bus-list" id="busList">
             <article class="bus-item"><div><small>성수SKV1센터1동 방면</small><strong class="bus-green">성동10</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
-            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-blue">302</strong></div><div><b>2분 30초</b><small>16분 23초</small></div></article>
-            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-lime">2012</strong></div><div><b>2분 30초</b><small>16분 23초</small></div></article>
-            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-lime">2022</strong></div><div><b>2분 30초</b><small>16분 23초</small></div></article>
+            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-blue">302</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
+            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-lime">2012</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
+            <article class="bus-item"><div><small>제인병원 방면</small><strong class="bus-lime">2022</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
+            <article class="bus-item"><div><small>광진광장 방면</small><strong class="bus-red">102</strong></div><div><b>2분 30초</b><small>도착 정보 없음</small></div></article>
           </div>
-          <button class="text-button" id="busSettingsButton" type="button">출퇴근길 버스 설정하기</button>
+          <button class="compat-only" id="busSettingsButton" type="button">버스 설정</button>
         </section>
 
-        <section class="card history-card" aria-labelledby="historyTitle">
-          <div class="card-heading-row"><h2 id="historyTitle">최근 5일 근무기록</h2><span class="sr-only" id="historyCount">0개</span></div>
-          <div id="historyList" class="history-list"></div>
-          <a class="text-button more-link" href="./calendar.html">근무기록 더 보기</a>
-          <button class="text-button" id="saveTodayButton" type="button" hidden>오늘 근무기록 저장</button>
+        <section class="card lunch-card" aria-labelledby="lunchTitle" data-reveal>
+          <div class="section-heading">
+            <span class="heading-icon meal-icon"><img src="./assets/figma/icon-meal.svg" alt="" /></span>
+            <h2 id="lunchTitle">점메추</h2>
+          </div>
+          <div class="restaurant-chips" role="group" aria-label="식당 선택">
+            <button class="restaurant-chip selected" type="button" data-menu="cafeteria">직당(일반)</button>
+            <button class="restaurant-chip" type="button" data-menu="special">직당(일품)</button>
+            <button class="restaurant-chip" type="button" data-menu="bombom">봄봄</button>
+            <button class="restaurant-chip" type="button" data-menu="biwon">비원</button>
+          </div>
+          <article class="menu-card" aria-live="polite">
+            <h3 id="menuTitle">중식(뷔페) 메뉴</h3>
+            <p id="menuText">한방돈수육&amp;새우젓<br />새콤달콤비빔칼국수<br />소고기오색탕평채<br />마늘아몬드연근조림<br />모듬야채쌈장무침<br />시래기된장국<br />배추겉절이<br />그린그린샐러드<br />잡곡밥</p>
+          </article>
+          <button class="instagram-link" id="lunchLink" type="button"><span>인스타그램 보러 가기</span><img src="./assets/figma/icon-right.svg" alt="" width="20" height="20" /></button>
         </section>
 
-        <section class="totals-card" hidden aria-hidden="true">
+        <div class="compat-data" hidden aria-hidden="true">
+          <ol id="weekCalendar"></ol>
+          <h2 id="progressTitle"></h2><strong id="progressPercent"></strong>
+          <span id="timelineFill"></span><span id="lunchStartMarker"></span><span id="lunchEndMarker"></span>
+          <span id="timelineStart"></span><span id="timelineLunchWrap"><span id="timelineLunch"></span></span>
+          <span id="timelineEndLabel"></span><span id="timelineEnd"></span>
+          <span id="historyCount"></span><div id="historyList"></div><button id="saveTodayButton" type="button"></button>
           <span id="monthTotal"></span><span id="lastMonthTotal"></span><span id="yearTotal"></span>
           <span id="monthBar"></span><span id="lastMonthBar"></span><span id="yearBar"></span>
-        </section>
+        </div>
       </main>
-
-      <nav class="bottom-nav" aria-label="주요 메뉴">
-        <a class="nav-item active" href="./index.html" aria-current="page"><img src="./assets/nav-home-active.svg" alt="" /><span>HOME</span></a>
-        <a class="nav-item" href="./vacation.html"><img src="./assets/nav-vacation.svg" alt="" /><span>VACATION</span></a>
-        <a class="nav-item" href="./calendar.html"><img src="./assets/nav-personal.svg" alt="" /><span>PERSONAL</span></a>
-        <a class="nav-item" href="./settings.html"><img src="./assets/nav-settings.svg" alt="" /><span>SETTINGS</span></a>
-      </nav>
     </div>
 
     <div class="dialog-backdrop" id="attendanceDialog" hidden>
@@ -93,5 +124,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./vacation-core.js" defer></script>
     <script src="./app.js" defer></script>
+    <script type="module" src="./motion.js"></script>
   </body>
 </html>
