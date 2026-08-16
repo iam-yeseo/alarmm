@@ -194,7 +194,18 @@
     };
 
     var vacationUnits = core.getVacationUnits(vacation);
-    if (vacationUnits > 0 && vacationUnits < 1) {
+    if (vacation && vacation.type === "hour" && vacation.startTime && vacation.endTime) {
+      var requestedStart = dateAtOffset(baseDate, settings.startTime, offsetAfterStart(vacation.startTime, settings.startTime));
+      var requestedEnd = dateAtOffset(baseDate, settings.startTime, offsetAfterStart(vacation.endTime, settings.startTime));
+      if (requestedEnd <= requestedStart) requestedEnd = new Date(requestedEnd.getTime() + 1440 * MINUTE_MS);
+      if (requestedStart <= schedule.start && requestedEnd < schedule.normalEnd) {
+        schedule.start = requestedEnd;
+      } else if (requestedEnd >= schedule.normalEnd && requestedStart > schedule.start) {
+        schedule.normalEnd = requestedStart;
+        schedule.countdownEnd = requestedStart;
+        schedule.progressEnd = requestedStart;
+      }
+    } else if (vacationUnits > 0 && vacationUnits < 1) {
       var regularDuration = activeDurationMs(
         schedule.start,
         schedule.normalEnd,
@@ -354,6 +365,7 @@
     if (vacation.type === "quarter") {
       return (vacation.period === "pm" ? "오후" : "오전") + " 반반차";
     }
+    if (vacation.type === "hour") return "시간 휴가 " + formatUnits(core.getVacationUnits(vacation)) + "일";
     if (vacation.type === "health") return "보건 휴가";
     if (vacation.type === "bereavement") return "경조사 휴가";
     if (vacation.type === "other") return "기타 미차감 휴가";
@@ -364,6 +376,9 @@
   function getVacationScheduleText(vacation, settings) {
     if (!vacation) return "";
     if (isFullDayVacation(vacation)) return "출퇴근 기록 없음";
+    if (vacation.type === "hour" && vacation.startTime && vacation.endTime) {
+      return vacation.startTime + " ~ " + vacation.endTime + " 사용";
+    }
     var baseDate = core.parseDateId(vacation.date) || new Date();
     var schedule = getSchedule(baseDate, settings, vacation);
     return formatTimeFromDate(schedule.start) + " 출근 · " + formatTimeFromDate(schedule.countdownEnd) + " 퇴근";
@@ -402,6 +417,14 @@
     var showRemainingAsMain = false;
     var lastCalendarSignature = "";
     var dialogConfirmAction = null;
+    var busState = {
+      mode: "",
+      arrivals: [],
+      fetchedAt: 0,
+      loading: false,
+      error: ""
+    };
+    var BUS_REFRESH_MS = 30 * 1000;
 
     function closeAttendanceDialog() {
       $("attendanceDialog").hidden = true;
@@ -492,7 +515,6 @@
     function getRemainingTarget(now, schedule, state) {
       if (state === "weekend") return nextWeekdayStart(now, settings.startTime, vacations);
       if (state === "before") return schedule.start;
-      if (state === "lunch") return schedule.lunchEnd;
       return schedule.countdownEnd;
     }
 
@@ -500,11 +522,44 @@
       return {
         weekend: "다음 출근까지",
         before: "출근까지 남은 시간",
-        lunch: "점심 종료까지",
+        lunch: "퇴근까지 남은 시간",
         working: "퇴근까지 남은 시간",
         overtime: "야근 종료까지",
         complete: "오늘 근무 완료"
       }[state];
+    }
+
+    function getHeroProgress(now, schedule, state) {
+      if (state === "vacation" || state === "weekend") return state === "vacation" ? 1 : 0;
+      if (state === "before") {
+        var dayStart = new Date(now);
+        dayStart.setHours(0, 0, 0, 0);
+        var preWorkDuration = schedule.start - dayStart;
+        return preWorkDuration > 0
+          ? Math.min(1, Math.max(0, (now - dayStart) / preWorkDuration))
+          : 0;
+      }
+      if (state === "complete") return 1;
+      return getTimelineProgress(now, schedule);
+    }
+
+    function renderGauge(progress) {
+      if (window.AlarmmMotion && window.AlarmmMotion.updateGauge) {
+        window.AlarmmMotion.updateGauge(progress);
+        return;
+      }
+
+      var gauge = document.querySelector(".clock-gauge");
+      var fill = $("arcDial");
+      var dot = $("gaugeDot");
+      if (!gauge || !fill || !dot) return;
+      var safeProgress = Math.min(1, Math.max(0, progress));
+      var width = gauge.getBoundingClientRect().width || 340;
+      var angle = Math.PI * (1 - safeProgress);
+      var x = (170 + 165 * Math.cos(angle)) * (width / 340) - 13;
+      var y = 180 - 165 * Math.sin(angle) - 13;
+      fill.style.clipPath = "inset(0 " + (100 - safeProgress * 100) + "% 0 0)";
+      dot.style.transform = "translate3d(" + x + "px," + y + "px,0)";
     }
 
     function renderClock() {
@@ -513,8 +568,8 @@
       var schedule = getSchedule(now, settings, vacation);
       var state = getDayState(now, schedule);
       var isLeaveDay = state === "vacation";
-      var progress = isLeaveDay ? 1 : state === "weekend" ? 0 : getProgress(now, schedule);
-      var timelineProgress = isLeaveDay ? 1 : state === "weekend" ? 0 : getTimelineProgress(now, schedule);
+      var progress = getHeroProgress(now, schedule, state);
+      var timelineProgress = progress;
 
       $("todayVacationBanner").hidden = !vacation;
       if (vacation) {
@@ -544,7 +599,7 @@
       }
 
       var percent = Math.round(progress * 100);
-      $("arcDial").style.setProperty("--gauge-progress", progress * 180 + "deg");
+      renderGauge(progress);
       $("progressTitle").textContent = isLeaveDay ? "오늘은 " + getVacationLabel(vacation, settings) : "오늘 진행률";
       $("progressPercent").textContent = isLeaveDay ? "휴가" : percent + "%";
       $("timelineFill").style.width = timelineProgress * 100 + "%";
@@ -573,6 +628,8 @@
 
       if (vacation) $("attendanceMessage").textContent = "오늘은 " + getVacationLabel(vacation, settings) + " 사용일이에요.";
       renderWorkState(state, schedule, vacation);
+      syncBusMode(now, schedule);
+      updateBusCountdowns();
     }
 
     function setWorkButton(button, label, action, className) {
@@ -804,16 +861,124 @@
     });
     $("checkoutButton").addEventListener("click", clockOut);
 
-    var busMode = "home";
-    $("busModeButton").addEventListener("click", function () {
-      busMode = busMode === "home" ? "work" : "home";
-      $("busTitle").textContent = busMode === "home" ? "퇴근길 미리보기" : "출근길 미리보기";
-      this.textContent = busMode === "home" ? "출근길 보기" : "퇴근길 보기";
-      showToast(busMode === "home" ? "퇴근길 버스를 보여드려요." : "출근길 버스를 보여드려요.");
-    });
-    $("busSettingsButton").addEventListener("click", function () {
-      showToast("버스 설정은 다음 업데이트에서 연결할게요.");
-    });
+    function busColorClass(arrival) {
+      if (/^성동/.test(arrival.routeName)) return "bus-green";
+      if (String(arrival.routeType) === "3") return "bus-blue";
+      if (String(arrival.routeType) === "4") return "bus-lime";
+      return "bus-red";
+    }
+
+    function formatBusCountdown(arrivalAt) {
+      var seconds = Math.max(0, Math.ceil((arrivalAt - Date.now()) / 1000));
+      if (seconds <= 0) return "곧 도착";
+      return Math.floor(seconds / 60) + "분 " + pad(seconds % 60) + "초";
+    }
+
+    function renderBusMessage(title, description) {
+      var list = $("busList");
+      list.innerHTML = "";
+      var item = document.createElement("article");
+      item.className = "bus-item bus-message-item";
+      var copy = document.createElement("div");
+      var heading = document.createElement("strong");
+      var detail = document.createElement("small");
+      heading.textContent = title;
+      detail.textContent = description;
+      copy.append(heading, detail);
+      item.appendChild(copy);
+      list.appendChild(item);
+    }
+
+    function renderBusArrivals() {
+      var list = $("busList");
+      list.innerHTML = "";
+      list.setAttribute("aria-busy", "false");
+
+      if (!busState.arrivals.length) {
+        renderBusMessage("도착 정보가 없어요", "잠시 후 자동으로 다시 확인할게요.");
+        return;
+      }
+
+      busState.arrivals.forEach(function (arrival) {
+        var item = document.createElement("article");
+        item.className = "bus-item";
+        var lineInfo = document.createElement("div");
+        var direction = document.createElement("small");
+        var route = document.createElement("strong");
+        direction.textContent = arrival.direction || arrival.stationName || "정류소 방면";
+        route.textContent = arrival.routeName || "—";
+        route.className = busColorClass(arrival);
+        lineInfo.append(direction, route);
+
+        var estimate = document.createElement("div");
+        var first = document.createElement("b");
+        var second = document.createElement("small");
+        if (Number.isFinite(arrival.firstSeconds)) {
+          first.dataset.arrivalAt = String(busState.fetchedAt + arrival.firstSeconds * 1000);
+        } else {
+          first.dataset.fallback = arrival.firstMessage || "도착 정보 없음";
+        }
+        if (Number.isFinite(arrival.secondSeconds)) {
+          second.dataset.arrivalAt = String(busState.fetchedAt + arrival.secondSeconds * 1000);
+          second.dataset.prefix = "다음 버스 ";
+        } else {
+          second.dataset.fallback = arrival.secondMessage || "다음 도착 정보 없음";
+        }
+        estimate.append(first, second);
+        item.append(lineInfo, estimate);
+        list.appendChild(item);
+      });
+      updateBusCountdowns();
+    }
+
+    function updateBusCountdowns() {
+      $("busList").querySelectorAll("[data-arrival-at], [data-fallback]").forEach(function (node) {
+        var arrivalAt = Number(node.dataset.arrivalAt || 0);
+        node.textContent = arrivalAt
+          ? (node.dataset.prefix || "") + formatBusCountdown(arrivalAt)
+          : node.dataset.fallback;
+      });
+    }
+
+    async function fetchBusArrivals(mode) {
+      if (!mode || busState.loading) return;
+      busState.loading = true;
+      $("busList").setAttribute("aria-busy", "true");
+      try {
+        var response = await fetch("./api/bus-arrivals?mode=" + encodeURIComponent(mode), {
+          headers: { Accept: "application/json" }
+        });
+        var data = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+          throw new Error(data.error && data.error.message ? data.error.message : "실시간 버스 정보를 불러오지 못했습니다.");
+        }
+        if (busState.mode !== mode) return;
+        busState.arrivals = Array.isArray(data.arrivals) ? data.arrivals : [];
+        busState.fetchedAt = Date.parse(data.fetchedAt) || Date.now();
+        busState.error = "";
+        renderBusArrivals();
+      } catch (error) {
+        if (busState.mode !== mode) return;
+        busState.arrivals = [];
+        busState.error = error && error.message ? error.message : "실시간 버스 정보를 불러오지 못했습니다.";
+        $("busList").setAttribute("aria-busy", "false");
+        renderBusMessage("버스 정보를 확인할 수 없어요", busState.error);
+      } finally {
+        busState.loading = false;
+        if (busState.mode && busState.mode !== mode) fetchBusArrivals(busState.mode);
+      }
+    }
+
+    function syncBusMode(now, schedule) {
+      var mode = now < schedule.start ? "commute" : "home";
+      $("busTitle").textContent = mode === "commute" ? "출근길 버스" : "퇴근길 버스";
+      if (busState.mode === mode) return;
+      busState.mode = mode;
+      busState.arrivals = [];
+      busState.fetchedAt = 0;
+      renderBusMessage("실시간 도착정보 확인 중", "서울시 버스 정보를 불러오고 있어요.");
+      fetchBusArrivals(mode);
+    }
 
     $("attendanceDialogCancel").addEventListener("click", closeAttendanceDialog);
     $("attendanceDialogConfirm").addEventListener("click", function () {
@@ -859,6 +1024,9 @@
       renderCalendar(new Date());
       renderClock();
     }, 1000);
+    window.setInterval(function () {
+      if (!document.hidden) fetchBusArrivals(busState.mode);
+    }, BUS_REFRESH_MS);
 
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden) {
@@ -870,7 +1038,14 @@
         renderCalendar(new Date());
         renderHistory();
         renderClock();
+        fetchBusArrivals(busState.mode);
       }
+    });
+    window.addEventListener("storage", function (event) {
+      if (event.key !== SETTINGS_KEY) return;
+      settings = loadSettings();
+      renderClock();
+      fetchBusArrivals(busState.mode);
     });
   }
 
@@ -1117,7 +1292,7 @@
     renderSummary();
   }
 
-  function initVacation() {
+  function initVacationLegacy() {
     var settings = loadSettings();
     var vacations = loadVacations();
     var attendance = loadAttendance();
@@ -1486,6 +1661,495 @@
         vacations = loadVacations();
         attendance = loadAttendance();
         history = loadHistory();
+        renderAll();
+      }
+    });
+
+    renderAll();
+  }
+
+  function initVacation() {
+    var settings = loadSettings();
+    var vacations = loadVacations();
+    var attendance = loadAttendance();
+    var history = loadHistory();
+    var form = $("vacationForm");
+    var dateField = $("vacationDate");
+    var endDateField = $("vacationEndDate");
+    var startPeriodField = $("vacationStartPeriod");
+    var endPeriodField = $("vacationEndPeriod");
+    var startTimeField = $("vacationStartTime");
+    var endTimeField = $("vacationEndTime");
+    var nonChargeField = $("vacationNonCharge");
+    var reasonGroup = form.querySelector(".reason-segments");
+    var flowDialog = $("vacationFlowDialog");
+    var todayId = localDateId(new Date());
+    var pendingAdditions = null;
+    var lastSaveError = "";
+
+    dateField.min = todayId;
+    endDateField.min = todayId;
+    startTimeField.value = settings.startTime;
+    endTimeField.value = settings.endTime;
+
+    function halfDayBoundary() {
+      if (settings.lunchEnabled) return settings.lunchStart;
+      return formatTimeFromMinutes(parseTime(settings.startTime) + Number(settings.workHours || 8) * 30);
+    }
+
+    function afternoonBoundary() {
+      return settings.lunchEnabled ? settings.lunchEnd : halfDayBoundary();
+    }
+
+    function selectedSpecialType() {
+      if (!nonChargeField.checked) return "full";
+      var selected = reasonGroup.querySelector("[data-special-choice].selected");
+      return selected ? selected.dataset.specialChoice : "health";
+    }
+
+    function rangeDateIds(startId, endId) {
+      var start = core.parseDateId(startId);
+      var end = core.parseDateId(endId);
+      var result = [];
+      if (!start || !end || end < start) return result;
+      for (var cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+        if (!isWeekend(cursor)) result.push(localDateId(cursor));
+        if (result.length > 60) break;
+      }
+      return result;
+    }
+
+    function firstBoundary() {
+      if (startPeriodField.value === "pm") return afternoonBoundary();
+      if (startPeriodField.value === "time") return startTimeField.value;
+      return settings.startTime;
+    }
+
+    function lastBoundary() {
+      if (endPeriodField.value === "am") return halfDayBoundary();
+      if (endPeriodField.value === "time") return endTimeField.value;
+      return settings.endTime;
+    }
+
+    function classifyVacation(startTime, endTime, units) {
+      if (units >= 0.99) return { type: "full", period: "day" };
+      if (Math.abs(units - 0.5) < 0.01) {
+        if (startTime === settings.startTime) return { type: "half", period: "am" };
+        if (endTime === settings.endTime) return { type: "half", period: "pm" };
+      }
+      if (Math.abs(units - 0.25) < 0.01) {
+        if (startTime === settings.startTime) return { type: "quarter", period: "am" };
+        if (endTime === settings.endTime) return { type: "quarter", period: "pm" };
+      }
+      return {
+        type: "hour",
+        period: parseTime(startTime) < parseTime(afternoonBoundary()) ? "am" : "pm"
+      };
+    }
+
+    function buildVacationPlan() {
+      var dates = rangeDateIds(dateField.value, endDateField.value);
+      var specialType = selectedSpecialType();
+      return dates.map(function (dateId, index) {
+        if (specialType !== "full") {
+          return { date: dateId, type: specialType, period: "day", units: 0 };
+        }
+
+        var startTime = index === 0 ? firstBoundary() : settings.startTime;
+        var endTime = index === dates.length - 1 ? lastBoundary() : settings.endTime;
+        var units = core.calculateVacationRangeDayUnits({
+          index: index,
+          total: dates.length,
+          startPeriod: startPeriodField.value,
+          endPeriod: endPeriodField.value,
+          startTime: startTime,
+          endTime: endTime,
+          settings: settings
+        });
+        var classification = classifyVacation(startTime, endTime, units);
+        return {
+          date: dateId,
+          type: classification.type,
+          period: classification.period,
+          units: units,
+          startTime: startTime,
+          endTime: endTime
+        };
+      });
+    }
+
+    function formatReviewDate(dateId, time) {
+      var date = core.parseDateId(dateId);
+      if (!date) return "—";
+      var weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+      return date.getFullYear() + ". " + pad(date.getMonth() + 1) + ". " + pad(date.getDate()) +
+        ". (" + weekdays[date.getDay()] + ") " + time;
+    }
+
+    function syncDateDisplay(input) {
+      var display = form.querySelector('[data-display-for="' + input.id + '"]');
+      if (!display) return;
+      display.textContent = formatDateInput(input.value);
+      display.parentElement.classList.toggle("has-value", Boolean(input.value));
+    }
+
+    function setReasonVisibility(show, animateChange) {
+      if (reasonGroup.hidden === !show) return;
+      if (animateChange && window.AlarmmMotion && window.AlarmmMotion.toggleVacationTypes) {
+        window.AlarmmMotion.toggleVacationTypes(reasonGroup, show);
+      } else {
+        reasonGroup.hidden = !show;
+      }
+      form.classList.toggle("has-vacation-types", show);
+    }
+
+    function disableForm(disabled) {
+      Array.prototype.forEach.call(form.elements, function (element) {
+        element.disabled = disabled;
+      });
+      form.classList.toggle("is-disabled", disabled);
+    }
+
+    function renderBalance() {
+      var hasHireDate = Boolean(settings.hireDate);
+      $("vacationSetupPrompt").hidden = hasHireDate;
+      disableForm(!hasHireDate);
+      $("advanceBadge").hidden = !settings.allowVacationAdvance;
+
+      if (!hasHireDate) {
+        $("balanceLabel").textContent = "남은 휴가일수";
+        $("balanceTitle").textContent = "입사일을 입력해주세요";
+        $("balanceKind").textContent = "휴가";
+        ["balanceValue", "grantedValue", "usedValue", "plannedValue", "expiryValue", "nextGrantText"].forEach(function (id) {
+          $(id).textContent = "—";
+        });
+        $("vacationHistoryNote").textContent = "입사일 이후의 기록이에요.";
+        return;
+      }
+
+      var balance = core.calculateBalance(settings.hireDate, vacations, todayId);
+      $("balanceLabel").textContent = balance.remaining < 0 ? "당겨쓴 휴가일수" : "남은 휴가일수";
+      $("balanceTitle").textContent = balance.label + " 잔여";
+      $("balanceKind").textContent = balance.label;
+      $("balanceValue").textContent = formatUnits(balance.remaining);
+      $("balanceValue").classList.toggle("negative", balance.remaining < 0);
+      $("grantedValue").textContent = formatUnits(balance.granted) + "일";
+      $("usedValue").textContent = formatUnits(balance.used);
+      var plannedUnits = vacations.reduce(function (total, vacation) {
+        return vacation.date >= todayId ? total + core.getVacationUnits(vacation) : total;
+      }, 0);
+      $("plannedValue").textContent = formatUnits(plannedUnits) + "일";
+      $("expiryValue").textContent = formatDateKorean(dateIdBefore(balance.periodEnd));
+      $("fullVacationLabel").textContent = balance.label + " 1일";
+      $("vacationHistoryNote").textContent = "이 기록은 " + formatDateKorean(balance.periodStart) + " 이후 기록이에요.";
+      $("nextGrantText").textContent = balance.nextGrantDate
+        ? formatDateKorean(balance.nextGrantDate)
+        : "첫 입사기념일까지 사용할 수 있어요.";
+    }
+
+    function renderFormState() {
+      syncDateDisplay(dateField);
+      syncDateDisplay(endDateField);
+      setReasonVisibility(nonChargeField.checked, false);
+      if (dateField.value && settings.hireDate) {
+        var entitlement = core.getEntitlement(settings.hireDate, dateField.value);
+        if (entitlement.eligible) $("fullVacationLabel").textContent = entitlement.label + " 1일";
+      }
+    }
+
+    function validateRequest() {
+      if (!settings.hireDate) return "설정에서 입사일을 먼저 입력해주세요.";
+      if (!dateField.value || !endDateField.value) return "휴가 시작일과 종료일을 선택해주세요.";
+      if (!startTimeField.value || !endTimeField.value) return "휴가 시작과 종료 시각을 입력해주세요.";
+      if (dateField.value < todayId) return "지난 날짜에는 휴가를 신청할 수 없어요.";
+      if (endDateField.value < dateField.value) return "종료일은 시작일보다 빠를 수 없어요.";
+
+      var workEndOffset = offsetAfterStart(settings.endTime, settings.startTime);
+      if (workEndOffset === 0) workEndOffset = 1440;
+      var startBoundaryOffset = offsetAfterStart(firstBoundary(), settings.startTime);
+      var endBoundaryOffset = offsetAfterStart(lastBoundary(), settings.startTime);
+      if (startBoundaryOffset > workEndOffset || endBoundaryOffset > workEndOffset) {
+        return "휴가 시각은 설정한 근무시간 안에서 선택해주세요.";
+      }
+      if (dateField.value === endDateField.value && endBoundaryOffset <= startBoundaryOffset) {
+        return "종료 시각은 시작 시각보다 늦어야 해요.";
+      }
+
+      var plan = buildVacationPlan();
+      if (!plan.length) return "선택한 기간에 신청할 근무일이 없어요.";
+      if (plan.length > 60) return "한 번에 신청할 수 있는 기간은 근무일 60일까지예요.";
+      if (selectedSpecialType() === "full" && plan.some(function (item) { return item.units <= 0; })) {
+        return "종료 시각은 시작 시각보다 늦어야 하고 근무시간 안에 있어야 해요.";
+      }
+
+      for (var index = 0; index < plan.length; index += 1) {
+        var item = plan[index];
+        if (findVacation(vacations, item.date)) return formatDateShort(item.date) + "에는 이미 신청한 휴가가 있어요.";
+        var existingAttendance = attendance[item.date];
+        var completedHistory = history.some(function (record) { return record.date === item.date; });
+        if (completedHistory) return formatDateShort(item.date) + "에는 이미 근무 완료 기록이 있어요.";
+        if (existingAttendance && existingAttendance.clockInAt && (isFullDayVacation(item) || item.period === "am")) {
+          return "이미 출근한 날에는 전일 또는 오전 휴가를 신청할 수 없어요.";
+        }
+      }
+
+      var units = plan.reduce(function (total, item) { return total + item.units; }, 0);
+      if (units > 0) {
+        var balance = core.calculateBalance(settings.hireDate, vacations, dateField.value);
+        if (!balance.eligible) return "입사일 이후의 날짜를 선택해주세요.";
+        if (!settings.allowVacationAdvance && balance.remaining - units < 0) {
+          return "남은 " + balance.label + "가 부족해요. 설정에서 당겨쓰기를 켜면 신청할 수 있어요.";
+        }
+      }
+      return "";
+    }
+
+    function renderReview() {
+      var plan = buildVacationPlan();
+      var first = plan[0];
+      var last = plan[plan.length - 1];
+      var units = plan.reduce(function (total, item) { return total + item.units; }, 0);
+      $("vacationReviewStart").textContent = formatReviewDate(first.date, first.startTime || settings.startTime);
+      $("vacationReviewEnd").textContent = formatReviewDate(last.date, last.endTime || settings.endTime);
+      $("vacationReviewUnits").textContent = units > 0
+        ? formatUnits(units) + "일"
+        : getVacationLabel(first, settings);
+    }
+
+    function renderVacationList() {
+      var list = $("vacationList");
+      var sorted = vacations.slice().sort(function (a, b) {
+        return String(b.date || "").localeCompare(String(a.date || "")) ||
+          String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+      });
+      var plannedCount = vacations.filter(function (vacation) { return vacation.date >= todayId; }).length;
+      $("vacationCount").textContent = plannedCount + "개 사용 예정";
+      list.innerHTML = "";
+
+      if (!sorted.length) {
+        var empty = document.createElement("div");
+        empty.className = "history-empty vacation-empty";
+        empty.innerHTML = "<strong>아직 신청한 휴가가 없어요.</strong><span>신청하면 출퇴근 일정에도 바로 반영돼요.</span>";
+        list.appendChild(empty);
+        return;
+      }
+
+      sorted.slice(0, 3).forEach(function (vacation) {
+        var article = document.createElement("article");
+        article.className = "vacation-item";
+        var header = document.createElement("div");
+        header.className = "vacation-item-heading";
+        var titleWrap = document.createElement("div");
+        var date = document.createElement("time");
+        date.dateTime = vacation.date;
+        date.textContent = formatDateKorean(vacation.date);
+        var title = document.createElement("h3");
+        title.textContent = getVacationLabel(vacation, settings);
+        titleWrap.append(date, title);
+        var status = document.createElement("span");
+        status.className = "vacation-status";
+        status.textContent = vacation.date < todayId ? "사용 완료" : vacation.date === todayId ? "오늘" : "신청 완료";
+        if (vacation.date < todayId) status.classList.add("complete");
+        header.append(titleWrap, status);
+        article.appendChild(header);
+
+        var cancel = document.createElement("button");
+        cancel.className = "vacation-cancel";
+        cancel.type = "button";
+        cancel.dataset.vacationId = vacation.id;
+        cancel.textContent = "신청 취소";
+        article.appendChild(cancel);
+        list.appendChild(article);
+      });
+    }
+
+    function renderAll() {
+      renderBalance();
+      renderFormState();
+      renderVacationList();
+    }
+
+    function stageElement(stage) {
+      return {
+        step2: $("vacationStep2"),
+        step3: $("vacationStep3"),
+        finish: $("vacationFinish"),
+        error: $("vacationError")
+      }[stage];
+    }
+
+    function showVacationStage(stage) {
+      var next = stageElement(stage);
+      if (!next) return;
+      document.body.style.overflow = "hidden";
+      if (window.AlarmmMotion && window.AlarmmMotion.setVacationStage) {
+        window.AlarmmMotion.setVacationStage(flowDialog, next);
+      } else {
+        flowDialog.hidden = false;
+        flowDialog.querySelectorAll(".bottom-sheet").forEach(function (panel) { panel.hidden = panel !== next; });
+      }
+      window.setTimeout(function () {
+        var focusTarget = next.querySelector("input:not([type='hidden']), button");
+        if (focusTarget) focusTarget.focus({ preventScroll: true });
+      }, 40);
+    }
+
+    function closeVacationFlow() {
+      var finish = function () {
+        flowDialog.hidden = true;
+        flowDialog.querySelectorAll(".bottom-sheet").forEach(function (panel) { panel.hidden = true; });
+        document.body.style.overflow = "";
+        $("vacationNextButton").focus();
+      };
+      if (window.AlarmmMotion && window.AlarmmMotion.closeVacationFlow) {
+        window.AlarmmMotion.closeVacationFlow(flowDialog, finish);
+      } else {
+        finish();
+      }
+    }
+
+    function setBoundaryDefaults(field) {
+      if (field === startPeriodField) {
+        if (field.value === "pm") startTimeField.value = afternoonBoundary();
+        else if (field.value !== "time" || !startTimeField.value) startTimeField.value = settings.startTime;
+        startTimeField.dispatchEvent(new Event("input", { bubbles: true }));
+      } else {
+        if (field.value === "am") endTimeField.value = halfDayBoundary();
+        else if (field.value !== "time" || !endTimeField.value) endTimeField.value = settings.endTime;
+        endTimeField.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+
+    function createPendingAdditions() {
+      var requestId = "request-" + (window.crypto && window.crypto.randomUUID
+        ? window.crypto.randomUUID()
+        : Date.now() + "-" + Math.random().toString(36).slice(2, 7));
+      var createdAt = new Date().toISOString();
+      return buildVacationPlan().map(function (item, index) {
+        return Object.assign({}, item, {
+          id: requestId + "-" + index,
+          requestId: requestId,
+          createdAt: createdAt
+        });
+      });
+    }
+
+    function resetVacationForm() {
+      dateField.value = "";
+      endDateField.value = "";
+      startPeriodField.value = "day";
+      endPeriodField.value = "day";
+      startTimeField.value = settings.startTime;
+      endTimeField.value = settings.endTime;
+      nonChargeField.checked = false;
+      form.querySelectorAll(".start-period-segments button, .end-period-segments button").forEach(function (button) {
+        button.classList.toggle("selected", button.dataset.periodChoice === "day" || button.dataset.endPeriodChoice === "day");
+      });
+      reasonGroup.querySelectorAll("button").forEach(function (button, index) { button.classList.toggle("selected", index === 0); });
+      renderFormState();
+      [startTimeField, endTimeField].forEach(function (field) {
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+
+    function savePendingVacation() {
+      if (!pendingAdditions) pendingAdditions = createPendingAdditions();
+      Array.prototype.push.apply(vacations, pendingAdditions);
+      if (!saveJson(VACATION_KEY, vacations)) {
+        vacations.splice(vacations.length - pendingAdditions.length, pendingAdditions.length);
+        lastSaveError = "브라우저 저장공간에 기록하지 못했어요. 저장공간과 개인정보 보호 설정을 확인해주세요.";
+        $("vacationErrorDescription").textContent = "휴가 신청에 실패했어요.";
+        showVacationStage("error");
+        return;
+      }
+
+      pendingAdditions = null;
+      renderAll();
+      resetVacationForm();
+      showVacationStage("finish");
+    }
+
+    form.addEventListener("change", renderFormState);
+    dateField.addEventListener("input", function () {
+      endDateField.min = dateField.value || todayId;
+      if (endDateField.value && endDateField.value < dateField.value) endDateField.value = dateField.value;
+      renderFormState();
+    });
+    endDateField.addEventListener("input", renderFormState);
+    startPeriodField.addEventListener("change", function () { setBoundaryDefaults(startPeriodField); });
+    endPeriodField.addEventListener("change", function () { setBoundaryDefaults(endPeriodField); });
+    nonChargeField.addEventListener("change", function () {
+      setReasonVisibility(nonChargeField.checked, true);
+    });
+
+    $("vacationNextButton").addEventListener("click", function () {
+      var error = !settings.hireDate
+        ? "설정에서 입사일을 먼저 입력해주세요."
+        : !dateField.value
+          ? "휴가 시작일을 선택해주세요."
+          : dateField.value < todayId
+            ? "지난 날짜에는 휴가를 신청할 수 없어요."
+            : "";
+      $("vacationFormError").textContent = error;
+      if (error) return;
+      endDateField.min = dateField.value;
+      if (!endDateField.value || endDateField.value < dateField.value) endDateField.value = dateField.value;
+      syncDateDisplay(endDateField);
+      showVacationStage("step2");
+    });
+
+    $("vacationReviewButton").addEventListener("click", function () {
+      var error = validateRequest();
+      $("vacationStep2Error").textContent = error;
+      $("vacationFormError").textContent = error;
+      if (error) return;
+      renderReview();
+      pendingAdditions = null;
+      showVacationStage("step3");
+    });
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var error = validateRequest();
+      if (error) {
+        $("vacationStep2Error").textContent = error;
+        showVacationStage("step2");
+        return;
+      }
+      savePendingVacation();
+    });
+
+    $("vacationRetryButton").addEventListener("click", savePendingVacation);
+    $("vacationExplainButton").addEventListener("click", function () {
+      $("vacationErrorDescription").textContent = lastSaveError || "입력한 날짜와 잔여 휴가를 다시 확인해주세요.";
+    });
+    $("vacationFinishButton").addEventListener("click", closeVacationFlow);
+    flowDialog.addEventListener("click", function (event) {
+      if (event.target === flowDialog) closeVacationFlow();
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !flowDialog.hidden) closeVacationFlow();
+    });
+
+    $("vacationList").addEventListener("click", function (event) {
+      var button = event.target.closest("[data-vacation-id]");
+      if (!button) return;
+      var targetVacation = vacations.find(function (vacation) { return vacation.id === button.dataset.vacationId; });
+      if (!targetVacation || !window.confirm(formatDateLong(targetVacation.date) + " 휴가 신청을 취소할까요?")) return;
+      vacations = vacations.filter(function (vacation) { return vacation.id !== targetVacation.id; });
+      saveJson(VACATION_KEY, vacations);
+      renderAll();
+      showToast("휴가 신청을 취소했어요.");
+    });
+
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) {
+        settings = loadSettings();
+        vacations = loadVacations();
+        attendance = loadAttendance();
+        history = loadHistory();
+        startTimeField.value = startTimeField.value || settings.startTime;
+        endTimeField.value = endTimeField.value || settings.endTime;
         renderAll();
       }
     });

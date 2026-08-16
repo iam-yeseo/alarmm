@@ -49,6 +49,73 @@
     return Math.round(Number(value || 0) * 100) / 100;
   }
 
+  function parseClockTime(value) {
+    if (!/^\d{2}:\d{2}$/.test(value || "")) return null;
+    var parts = value.split(":").map(Number);
+    if (parts[0] > 23 || parts[1] > 59) return null;
+    return parts[0] * 60 + parts[1];
+  }
+
+  function normalizeAfter(value, reference) {
+    return value < reference ? value + 1440 : value;
+  }
+
+  function calculateTimedVacationUnits(startTime, endTime, settings) {
+    var requestedStart = parseClockTime(startTime);
+    var requestedEnd = parseClockTime(endTime);
+    var workStart = parseClockTime(settings && settings.startTime);
+    var workEnd = parseClockTime(settings && settings.endTime);
+    if ([requestedStart, requestedEnd, workStart, workEnd].some(function (value) { return value === null; })) {
+      return 0;
+    }
+
+    workEnd = normalizeAfter(workEnd, workStart);
+    requestedStart = normalizeAfter(requestedStart, workStart);
+    requestedEnd = normalizeAfter(requestedEnd, requestedStart);
+    var rangeStart = Math.max(workStart, requestedStart);
+    var rangeEnd = Math.min(workEnd, requestedEnd);
+    var activeMinutes = Math.max(0, rangeEnd - rangeStart);
+
+    if (activeMinutes > 0 && settings.lunchEnabled) {
+      var lunchStart = parseClockTime(settings.lunchStart);
+      var lunchEnd = parseClockTime(settings.lunchEnd);
+      if (lunchStart !== null && lunchEnd !== null) {
+        lunchStart = normalizeAfter(lunchStart, workStart);
+        lunchEnd = normalizeAfter(lunchEnd, lunchStart);
+        activeMinutes -= Math.max(0, Math.min(rangeEnd, lunchEnd) - Math.max(rangeStart, lunchStart));
+      }
+    }
+
+    var dailyMinutes = Math.max(1, Number(settings.workHours || 8) * 60);
+    return roundUnits(Math.max(0, activeMinutes) / dailyMinutes);
+  }
+
+  function calculateVacationRangeDayUnits(options) {
+    var value = options || {};
+    var index = Number(value.index || 0);
+    var total = Number(value.total || 0);
+    if (total < 1 || index < 0 || index >= total) return 0;
+
+    var isFirst = index === 0;
+    var isLast = index === total - 1;
+    var startPeriod = value.startPeriod || "day";
+    var endPeriod = value.endPeriod || "day";
+    var hasCustomBoundary = (isFirst && startPeriod === "time") || (isLast && endPeriod === "time");
+    if (hasCustomBoundary) {
+      return calculateTimedVacationUnits(value.startTime, value.endTime, value.settings || {});
+    }
+
+    if (total === 1) {
+      if (startPeriod === "pm" && (endPeriod === "day" || endPeriod === "pm")) return 0.5;
+      if ((startPeriod === "day" || startPeriod === "am") && endPeriod === "am") return 0.5;
+      return 1;
+    }
+
+    if (isFirst && startPeriod === "pm") return 0.5;
+    if (isLast && endPeriod === "am") return 0.5;
+    return 1;
+  }
+
   function getEntitlement(hireDateId, referenceValue) {
     var hireDate = parseDateId(hireDateId);
     var referenceDate =
@@ -100,7 +167,7 @@
   }
 
   function isChargeableVacation(vacation) {
-    return ["full", "half", "quarter"].indexOf(vacation && vacation.type) !== -1;
+    return ["full", "half", "quarter", "hour"].indexOf(vacation && vacation.type) !== -1;
   }
 
   function getVacationUnits(vacation) {
@@ -108,6 +175,7 @@
     if (vacation.type === "full") return 1;
     if (vacation.type === "half") return 0.5;
     if (vacation.type === "quarter") return 0.25;
+    if (vacation.type === "hour") return roundUnits(vacation.units);
     if (vacation.type === "birthday") return 0.5;
     return 0;
   }
@@ -136,6 +204,8 @@
   return {
     addMonths: addMonths,
     calculateBalance: calculateBalance,
+    calculateTimedVacationUnits: calculateTimedVacationUnits,
+    calculateVacationRangeDayUnits: calculateVacationRangeDayUnits,
     getEntitlement: getEntitlement,
     getVacationUnits: getVacationUnits,
     isChargeableVacation: isChargeableVacation,

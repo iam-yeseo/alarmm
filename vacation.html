@@ -40,23 +40,29 @@
         <form class="card vacation-apply-card" id="vacationForm" novalidate data-reveal>
           <div class="vacation-form-heading"><h2>휴가 신청하기</h2><span class="mini-badge" id="advanceBadge" hidden>당겨쓰기 가능</span></div>
           <div class="input-block vacation-date-block">
-            <span class="control-label">휴가 시작일</span>
-            <button class="display-input vacation-date-open" id="vacationOpenButton" type="button"><span id="vacationDateDisplay">0000. 00. 00.</span></button>
+            <label class="line-control date-control">
+              <span class="control-label">휴가 시작일</span>
+              <span class="display-input date-display">
+                <span class="display-value" id="vacationDateDisplay" data-display-for="vacationDate">0000. 00. 00.</span>
+                <input id="vacationDate" name="vacationDate" type="date" required />
+              </span>
+            </label>
             <p class="field-note">휴가 시작일을 입력해주세요.</p>
           </div>
-          <div class="segmented-control day-segments" role="group" aria-label="휴가 시간 단위">
+          <div class="segmented-control day-segments start-period-segments" role="group" aria-label="휴가 시작 시간 단위">
             <button class="selected" type="button" data-period-choice="day">종일</button>
             <button type="button" data-period-choice="am">오전</button>
             <button type="button" data-period-choice="pm">오후</button>
-            <button type="button" data-period-choice="qam">시간</button>
+            <button type="button" data-period-choice="time">시간</button>
           </div>
+          <input id="vacationStartPeriod" name="vacationStartPeriod" type="hidden" value="day" />
           <div class="input-block vacation-time-block">
             <label class="line-control time-control">
               <span class="control-label">시작 시각 입력</span>
               <span class="display-input split-display">
                 <span class="display-value"><b data-time-hour="vacationStartTime">00</b>시</span>
                 <span class="display-value"><b data-time-minute="vacationStartTime">00</b>분</span>
-                <input id="vacationStartTime" type="time" />
+                <input id="vacationStartTime" name="vacationStartTime" type="time" required />
               </span>
             </label>
             <p class="field-note">휴가 시작 시각을 입력해주세요.</p>
@@ -66,37 +72,68 @@
             <span class="check-box" aria-hidden="true"><img src="./assets/figma/checkmark.svg" alt="" /></span>
             <span>연차 차감 제외 휴가예요.</span>
           </label>
-          <div class="segmented-control reason-segments" role="group" aria-label="차감 제외 휴가 종류">
+          <div class="segmented-control reason-segments" role="group" aria-label="차감 제외 휴가 종류" hidden>
             <button class="selected" type="button" data-special-choice="health">보건</button>
             <button type="button" data-special-choice="bereavement">경조사</button>
             <button type="button" data-special-choice="other">기타</button>
           </div>
           <p class="form-error vacation-form-error" id="vacationFormError" role="alert"></p>
           <button class="primary-button" id="vacationNextButton" type="button">계속하기</button>
+          <span class="sr-only" id="fullVacationLabel">연차 1일</span>
 
-          <div class="sheet-backdrop" id="vacationFlowDialog" hidden>
-            <section class="bottom-sheet date-sheet" id="vacationDateSheet" role="dialog" aria-modal="true" aria-labelledby="vacationDateSheetTitle">
-              <button class="sheet-close" id="vacationSheetClose" type="button" aria-label="닫기">×</button>
-              <h2 id="vacationDateSheetTitle">날짜 지정하기</h2><p>휴가 시작일과 종료일을 입력해주세요.</p>
-              <label class="sheet-date-field"><span>시작일</span><input id="vacationDate" name="vacationDate" type="date" required /><select id="vacationStartPeriod" aria-label="시작일 휴가 단위"><option value="day">전일</option><option value="am">오전</option><option value="pm">오후</option><option value="qam">오전 반반차</option><option value="qpm">오후 반반차</option></select></label>
-              <label class="sheet-date-field"><span>종료일</span><input id="vacationEndDate" name="vacationEndDate" type="date" required /><select id="vacationEndPeriod" aria-label="종료일 휴가 단위"><option value="day">전일</option><option value="am">오전</option><option value="pm">오후</option><option value="qam">오전 반반차</option><option value="qpm">오후 반반차</option></select></label>
-              <button class="primary-button" id="vacationDateNext" type="button">휴가 옵션 선택하기</button>
+          <div class="sheet-backdrop vacation-flow-backdrop" id="vacationFlowDialog" hidden>
+            <section class="bottom-sheet vacation-step-sheet" id="vacationStep2" role="dialog" aria-modal="true" aria-labelledby="vacationStep2Title" hidden>
+              <h2 id="vacationStep2Title">휴가 신청하기</h2>
+              <div class="input-block vacation-date-block">
+                <label class="line-control date-control">
+                  <span class="control-label">휴가 종료일</span>
+                  <span class="display-input date-display">
+                    <span class="display-value" data-display-for="vacationEndDate">0000. 00. 00.</span>
+                    <input id="vacationEndDate" name="vacationEndDate" type="date" required />
+                  </span>
+                </label>
+                <p class="field-note">휴가 종료일을 입력해주세요.</p>
+              </div>
+              <div class="segmented-control end-period-segments" role="group" aria-label="휴가 종료 시간 단위">
+                <button class="selected" type="button" data-end-period-choice="day">종일</button>
+                <button type="button" data-end-period-choice="am">오전</button>
+                <button type="button" data-end-period-choice="pm">오후</button>
+                <button type="button" data-end-period-choice="time">시간</button>
+              </div>
+              <input id="vacationEndPeriod" name="vacationEndPeriod" type="hidden" value="day" />
+              <div class="input-block vacation-time-block">
+                <label class="line-control time-control">
+                  <span class="control-label">종료 시각 입력</span>
+                  <span class="display-input split-display">
+                    <span class="display-value"><b data-time-hour="vacationEndTime">00</b>시</span>
+                    <span class="display-value"><b data-time-minute="vacationEndTime">00</b>분</span>
+                    <input id="vacationEndTime" name="vacationEndTime" type="time" required />
+                  </span>
+                </label>
+                <p class="field-note">휴가 종료 시각을 입력해주세요.</p>
+              </div>
+              <p class="form-error vacation-step-error" id="vacationStep2Error" role="alert"></p>
+              <button class="primary-button" id="vacationReviewButton" type="button">휴가 신청하기</button>
             </section>
 
-            <section class="bottom-sheet option-sheet" id="vacationOptionSheet" role="dialog" aria-modal="true" aria-labelledby="vacationOptionSheetTitle" hidden>
-              <button class="sheet-close sheet-back" id="vacationOptionBack" type="button" aria-label="날짜 선택으로 돌아가기">‹</button>
-              <h2 id="vacationOptionSheetTitle">휴가 옵션 선택</h2><p>해당되는 사항을 선택해주세요.</p>
-              <div class="special-options">
-                <label class="special-row"><span><strong>보건 휴가</strong><small>잔여 휴가에서 차감하지 않아요.</small></span><input type="radio" name="vacationType" value="health" /></label>
-                <label class="special-row"><span><strong>경조사 휴가</strong><small>잔여 휴가에서 차감하지 않아요.</small></span><input type="radio" name="vacationType" value="bereavement" /></label>
-                <label class="special-row"><span><strong>기타 미차감 휴가</strong><small>잔여 휴가에서 차감하지 않아요.</small></span><input type="radio" name="vacationType" value="other" /></label>
-                <label class="special-row"><span><strong>일반 연차·월차</strong><small>선택한 날짜만큼 잔여 휴가에서 차감돼요.</small></span><input type="radio" name="vacationType" value="full" checked /></label>
-                <label class="special-row warning-row"><span><strong>허가 받지 않은 휴가</strong><small>권고사직 사유가 될 수 있어요.</small></span><input id="vacationUnauthorized" type="checkbox" /></label>
-              </div>
-              <fieldset class="vacation-period-fieldset" id="vacationPeriodFields" hidden><legend>사용 시간대</legend><div class="period-segment"><label><input type="radio" name="vacationPeriod" value="am" checked /><span>오전</span></label><label><input type="radio" name="vacationPeriod" value="pm" /><span>오후</span></label></div><p id="vacationSchedulePreview">휴가에 맞춰 출퇴근 시각을 계산해드려요.</p></fieldset>
-              <label class="field-control vacation-memo-field"><span>메모 <em>선택</em></span><input id="vacationMemo" name="vacationMemo" type="text" maxlength="60" placeholder="필요한 내용을 남겨주세요" /></label>
-              <span class="sr-only" id="fullVacationLabel">연차 1일</span>
-              <button class="primary-button" id="vacationSubmit" type="submit">휴가 신청하기</button>
+            <section class="bottom-sheet vacation-review-sheet" id="vacationStep3" role="dialog" aria-modal="true" aria-labelledby="vacationStep3Title" hidden>
+              <div class="vacation-sheet-copy"><h2 id="vacationStep3Title">휴가 신청 확인</h2><p>휴가 시작일과 종료일을 확인해주세요.</p></div>
+              <dl class="vacation-review-data">
+                <div><dt>시작일</dt><dd id="vacationReviewStart">—</dd></div>
+                <div><dt>종료일</dt><dd id="vacationReviewEnd">—</dd></div>
+                <div><dt>사용 휴가</dt><dd id="vacationReviewUnits">—</dd></div>
+              </dl>
+              <button class="primary-button" id="vacationSubmit" type="submit">이대로 신청할게요</button>
+            </section>
+
+            <section class="bottom-sheet vacation-result-sheet" id="vacationFinish" role="dialog" aria-modal="true" aria-labelledby="vacationFinishTitle" hidden>
+              <div class="vacation-sheet-copy"><h2 id="vacationFinishTitle">휴가 신청 완료</h2><p>휴가 신청이 완료되었어요.</p></div>
+              <button class="primary-button" id="vacationFinishButton" type="button">즐겁게 놀아볼래요</button>
+            </section>
+
+            <section class="bottom-sheet vacation-result-sheet vacation-error-sheet" id="vacationError" role="alertdialog" aria-modal="true" aria-labelledby="vacationErrorTitle" hidden>
+              <div class="vacation-sheet-copy"><h2 id="vacationErrorTitle">휴가 신청 실패</h2><p id="vacationErrorDescription">휴가 신청에 실패했어요.</p></div>
+              <div class="vacation-error-actions"><button class="primary-button secondary-button" id="vacationRetryButton" type="button">다시 시도</button><button class="primary-button" id="vacationExplainButton" type="button">왜요?</button></div>
             </section>
           </div>
         </form>
