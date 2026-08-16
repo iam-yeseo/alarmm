@@ -1,0 +1,13 @@
+{
+  "name": "alarmm",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --check public/app.js && node --check public/motion.js && node --check public/vacation-core.js && node --check worker/index.mjs && node --check worker/bus-arrivals.mjs && node tests/vacation-core.test.js && node tests/bus-api-core.test.mjs && node tests/bus-api-function.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.123.0"
+  }
+}

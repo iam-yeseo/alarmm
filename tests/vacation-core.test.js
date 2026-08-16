@@ -1,7 +1,7 @@
 "use strict";
 
 var assert = require("node:assert/strict");
-var core = require("../vacation-core.js");
+var core = require("../public/vacation-core.js");
 
 function balance(hireDate, referenceDate, vacations) {
   return core.calculateBalance(hireDate, vacations || [], referenceDate);

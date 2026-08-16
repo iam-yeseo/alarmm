@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { onRequestGet } from "../functions/api/bus-arrivals.js";
+import { onRequestGet } from "../worker/bus-arrivals.mjs";
 
 const missingKeyResponse = await onRequestGet({
   request: new Request("https://alarmm.example/api/bus-arrivals?mode=commute"),
@@ -47,8 +47,22 @@ try {
   assert.equal(body.arrivals[0].routeName, "성동10");
   assert.equal(body.arrivals[0].firstSeconds, 130);
   assert.equal(body.arrivals[0].secondSeconds, 425);
+
+  const originalConsoleError = console.error;
+  console.error = () => {};
+  try {
+    globalThis.fetch = async () => new Response(new Uint8Array(2_000_001), { status: 200 });
+    const oversizedResponse = await onRequestGet({
+      request: new Request("https://alarmm.example/api/bus-arrivals?mode=commute"),
+      env: { SEOUL_BUS_API_KEY: "key" },
+    });
+    assert.equal(oversizedResponse.status, 502, "크기 헤더가 없는 과대 응답도 제한한다");
+    assert.equal((await oversizedResponse.json()).error.code, "UPSTREAM_ERROR");
+  } finally {
+    console.error = originalConsoleError;
+  }
 } finally {
   globalThis.fetch = originalFetch;
 }
 
-console.log("bus-api-function: 13 assertions passed");
+console.log("bus-api-function: 15 assertions passed");
