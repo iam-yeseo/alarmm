@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  completeRouteArrivals,
   normalizeServiceKey,
   parseArrivalSeconds,
   parseBusXml,
@@ -7,6 +8,12 @@ import {
 } from "../bus-api-core.mjs";
 
 assert.equal(normalizeServiceKey("abc%2B123%3D"), "abc+123=", "인코딩 키를 한 번만 복원한다");
+assert.equal(normalizeServiceKey('"abc%2B123%3D"'), "abc+123=", "대시보드에 따옴표와 함께 입력한 키도 정규화한다");
+assert.equal(
+  normalizeServiceKey("https://example.test?serviceKey=abc%2B123%3D&arsId=04540"),
+  "abc+123=",
+  "전체 요청 URL을 붙여넣어도 인증키만 추출한다",
+);
 assert.equal(parseArrivalSeconds("150", "2분 30초후"), 150, "초 단위 원본 값을 우선한다");
 assert.equal(parseArrivalSeconds("", "3분 12초후"), 192, "메시지에서도 분초를 계산한다");
 
@@ -21,6 +28,21 @@ assert.equal(parsed[0].direction, "제인병원 방면", "다음 정류장으로
 assert.equal(parsed[0].firstSeconds, 150, "첫 버스 도착 초를 유지한다");
 assert.equal(parsed[0].secondSeconds, 430, "두 번째 버스 도착 초를 유지한다");
 
+const ordered = parseBusXml(xml, { arsId: "04210", direction: "제인병원 방면", routes: ["2012", "302", "2222"] });
+assert.deepEqual(ordered.map((arrival) => arrival.routeName), ["2012", "302"], "화면에 지정한 노선 순서로 정렬한다");
+const completed = completeRouteArrivals(
+  [{ arsId: "04210", direction: "제인병원 방면", routes: ["302", "2012", "2222"] }],
+  ordered,
+);
+assert.deepEqual(completed.map((arrival) => arrival.routeName), ["302", "2012", "2222"], "세 개 퇴근 노선을 항상 노출한다");
+assert.equal(completed[2].firstMessage, "현재 운행 정보 없음", "도착 응답이 없는 노선은 운행 상태를 표시한다");
+
+assert.throws(
+  () => parseBusXml("<OpenAPI_ServiceResponse><cmmMsgHeader><returnReasonCode>20</returnReasonCode><returnAuthMsg>SERVICE ACCESS DENIED ERROR.</returnAuthMsg></cmmMsgHeader></OpenAPI_ServiceResponse>", { arsId: "04540", routes: [] }),
+  /SERVICE ACCESS DENIED/,
+  "공공데이터포털 인증 오류 형식도 감지한다",
+);
+
 const fallback = [{ arsId: "04210", direction: "제인병원 방면", routes: ["302"] }];
 assert.equal(parseStopConfig("", fallback), fallback, "환경 변수가 없으면 기본 정류소를 쓴다");
 assert.deepEqual(
@@ -30,4 +52,4 @@ assert.deepEqual(
 );
 assert.throws(() => parseStopConfig('[{"arsId":"12"}]', fallback), /5자리/, "잘못된 정류소 번호를 거부한다");
 
-console.log("bus-api-core: 10 assertions passed");
+console.log("bus-api-core: 16 assertions passed");

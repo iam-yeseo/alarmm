@@ -334,7 +334,7 @@
   }
 
   function isWeekend(date) {
-    return date.getDay() === 0 || date.getDay() === 6;
+    return core.isWeekend(date);
   }
 
   function findVacation(vacations, dateId) {
@@ -385,17 +385,16 @@
   }
 
   function nextWeekdayStart(now, startTime, vacations) {
-    var candidate = new Date(now);
-    candidate.setDate(candidate.getDate() + 1);
-    while (
-      isWeekend(candidate) ||
-      isFullDayVacation(findVacation(vacations || [], localDateId(candidate)))
-    ) {
-      candidate.setDate(candidate.getDate() + 1);
-    }
-    var minutes = parseTime(startTime);
-    candidate.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-    return candidate;
+    var nonWorkingDateIds = (vacations || []).filter(isFullDayVacation).map(function (vacation) {
+      return vacation.date;
+    });
+    return core.nextWorkdayStart(now, startTime, nonWorkingDateIds);
+  }
+
+  function formatNextWorkStart(date) {
+    var weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+    return "다음 출근일은 " + (date.getMonth() + 1) + "월 " + date.getDate() + "일 (" +
+      weekdays[date.getDay()] + ") " + formatTimeFromDate(date) + "이에요.";
   }
 
   function showToast(message) {
@@ -555,10 +554,14 @@
       if (!gauge || !fill || !dot) return;
       var safeProgress = Math.min(1, Math.max(0, progress));
       var width = gauge.getBoundingClientRect().width || 340;
-      var angle = Math.PI * (1 - safeProgress);
+      var endpointAngle = Math.asin(30.5 / 165);
+      var startAngle = Math.PI + endpointAngle;
+      var endAngle = -endpointAngle;
+      var angle = startAngle + (endAngle - startAngle) * safeProgress;
       var x = (170 + 165 * Math.cos(angle)) * (width / 340) - 13;
-      var y = 180 - 165 * Math.sin(angle) - 13;
-      fill.style.clipPath = "inset(0 " + (100 - safeProgress * 100) + "% 0 0)";
+      var y = 170 - 165 * Math.sin(angle) - 13;
+      fill.style.strokeDashoffset = String(1 - safeProgress);
+      fill.style.opacity = safeProgress > 0 ? "1" : "0";
       dot.style.transform = "translate3d(" + x + "px," + y + "px,0)";
     }
 
@@ -619,11 +622,18 @@
       $("lunchEndMarker").hidden = isLeaveDay || !schedule.lunchEnabled;
 
       if ($("statusStart")) {
-        $("statusStart").textContent = isLeaveDay ? "휴가" : formatTimeFromDate(schedule.start) + ":00";
-        $("statusLunch").textContent = schedule.lunchEnabled
-          ? settings.lunchStart + " ~ " + settings.lunchEnd
-          : "없음";
-        $("statusEnd").textContent = isLeaveDay ? "휴가" : formatTimeFromDate(schedule.countdownEnd) + ":00";
+        var isNonWorkDay = isLeaveDay || state === "weekend";
+        $("statusList").hidden = isNonWorkDay;
+        $("statusDayOff").hidden = !isNonWorkDay;
+        if (isNonWorkDay) {
+          $("statusNextWork").textContent = formatNextWorkStart(nextWeekdayStart(now, settings.startTime, vacations));
+        } else {
+          $("statusStart").textContent = formatTimeFromDate(schedule.start) + ":00";
+          $("statusLunch").textContent = schedule.lunchEnabled
+            ? settings.lunchStart + " ~ " + settings.lunchEnd
+            : "없음";
+          $("statusEnd").textContent = formatTimeFromDate(schedule.countdownEnd) + ":00";
+        }
       }
 
       if (vacation) $("attendanceMessage").textContent = "오늘은 " + getVacationLabel(vacation, settings) + " 사용일이에요.";
@@ -660,7 +670,7 @@
       if (state === "vacation") {
         setWorkButton(button, getVacationLabel(vacation, settings) + " · 출퇴근 기록 없음", "", "leave");
       } else if (state === "weekend") {
-        setWorkButton(button, "오늘은 쉬어가는 날", "", "");
+        setWorkButton(button, "오늘은 출근하는 날이 아니에요", "", "");
       } else if (todayAttendance && todayAttendance.clockOutAt) {
         setWorkButton(button, "퇴근 완료", "", "complete");
       } else if (recorded) {

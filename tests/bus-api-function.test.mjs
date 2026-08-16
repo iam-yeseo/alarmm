@@ -51,6 +51,16 @@ try {
   const originalConsoleError = console.error;
   console.error = () => {};
   try {
+    globalThis.fetch = async () => new Response(`<?xml version="1.0"?><ServiceResult>
+      <msgHeader><headerCd>20</headerCd><headerMsg>Key인증실패: SERVICE ACCESS DENIED ERROR.[인증모듈 에러코드(20)]</headerMsg></msgHeader>
+    </ServiceResult>`, { status: 200 });
+    const authenticationResponse = await onRequestGet({
+      request: new Request("https://alarmm.example/api/bus-arrivals?mode=commute"),
+      env: { SEOUL_BUS_API_KEY: "key" },
+    });
+    assert.equal(authenticationResponse.status, 502, "상위 API 인증 실패를 구분한다");
+    assert.equal((await authenticationResponse.json()).error.code, "UPSTREAM_AUTH_ERROR");
+
     globalThis.fetch = async () => new Response(new Uint8Array(2_000_001), { status: 200 });
     const oversizedResponse = await onRequestGet({
       request: new Request("https://alarmm.example/api/bus-arrivals?mode=commute"),
@@ -65,4 +75,4 @@ try {
   globalThis.fetch = originalFetch;
 }
 
-console.log("bus-api-function: 15 assertions passed");
+console.log("bus-api-function: 17 assertions passed");

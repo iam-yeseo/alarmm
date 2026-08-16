@@ -1,4 +1,5 @@
 import {
+  completeRouteArrivals,
   normalizeServiceKey,
   parseBusXml,
   parseStopConfig,
@@ -94,8 +95,14 @@ export async function onRequestGet(context) {
 
     if (!arrivals.length && failures.length === stops.length) {
       console.error(JSON.stringify({ message: "all bus upstream requests failed", mode, failures }));
+      const authenticationFailure = failures.find((failure) => /Key인증실패|SERVICE ACCESS DENIED|인증모듈|등록되지 않은 인증키/i.test(failure.message));
       return jsonResponse({
-        error: { code: "UPSTREAM_ERROR", message: "실시간 버스 정보를 불러오지 못했습니다." },
+        error: authenticationFailure
+          ? {
+              code: "UPSTREAM_AUTH_ERROR",
+              message: "서울시 버스 API 인증을 확인해주세요. 공공데이터포털의 버스도착정보조회 서비스 활용 상태와 인증키를 확인해주세요.",
+            }
+          : { code: "UPSTREAM_ERROR", message: "실시간 버스 정보를 불러오지 못했습니다." },
       }, 502);
     }
 
@@ -107,7 +114,7 @@ export async function onRequestGet(context) {
       mode,
       fetchedAt: new Date().toISOString(),
       source: "서울특별시 버스운행정보 공유서비스",
-      arrivals: arrivals.slice(0, 5),
+      arrivals: completeRouteArrivals(stops, arrivals).slice(0, 5),
     });
   } catch (error) {
     console.error(JSON.stringify({

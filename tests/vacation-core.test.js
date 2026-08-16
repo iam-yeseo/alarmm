@@ -91,4 +91,16 @@ assert.equal(
   "당겨쓰기를 허용하면 잔여 계산은 마이너스 단위를 보존한다"
 );
 
-console.log("vacation-core: 19 assertions passed");
+assert.equal(core.isWeekend(new Date(2026, 7, 16)), true, "일요일은 기본 비근무일이다");
+assert.equal(core.isWeekend(new Date(2026, 7, 17)), false, "평일은 기본 근무일이다");
+assert.equal(
+  core.localDateId(core.nextWorkdayStart(new Date(2026, 7, 14, 18), "09:30", [])),
+  "2026-08-17",
+  "금요일 다음 출근일은 월요일이다"
+);
+var nextAfterVacation = core.nextWorkdayStart(new Date(2026, 7, 16, 18), "09:30", ["2026-08-17"]);
+assert.equal(core.localDateId(nextAfterVacation), "2026-08-18", "전일 휴가도 다음 출근일에서 제외한다");
+assert.equal(nextAfterVacation.getHours(), 9, "설정한 출근 시각의 시를 반영한다");
+assert.equal(nextAfterVacation.getMinutes(), 30, "설정한 출근 시각의 분을 반영한다");
+
+console.log("vacation-core: 25 assertions passed");
