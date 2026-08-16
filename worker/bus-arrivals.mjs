@@ -2,7 +2,7 @@ import {
   normalizeServiceKey,
   parseBusXml,
   parseStopConfig,
-} from "../../bus-api-core.mjs";
+} from "../bus-api-core.mjs";
 
 const DEFAULT_STOPS = {
   commute: [
@@ -26,6 +26,27 @@ function jsonResponse(body, status = 200) {
   });
 }
 
+async function readTextWithinLimit(response, byteLimit) {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let byteLength = 0;
+  let text = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    byteLength += value.byteLength;
+    if (byteLength > byteLimit) {
+      await reader.cancel("response exceeded byte limit");
+      throw new Error("서울시 버스 API 응답이 예상 크기를 초과했습니다.");
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+
+  return text + decoder.decode();
+}
+
 async function fetchStopArrivals(stop, apiKey) {
   const url = new URL("http://ws.bus.go.kr/api/rest/stationinfo/getStationByUid");
   url.searchParams.set("serviceKey", apiKey);
@@ -39,7 +60,7 @@ async function fetchStopArrivals(stop, apiKey) {
 
   const contentLength = Number(response.headers.get("content-length") || 0);
   if (contentLength > 2_000_000) throw new Error("서울시 버스 API 응답이 예상 크기를 초과했습니다.");
-  return parseBusXml(await response.text(), stop);
+  return parseBusXml(await readTextWithinLimit(response, 2_000_000), stop);
 }
 
 export async function onRequestGet(context) {
