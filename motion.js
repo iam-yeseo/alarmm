@@ -10,6 +10,35 @@ function play(targets, parameters) {
   return animate(targets, parameters);
 }
 
+function gaugePosition(progress) {
+  const gauge = document.querySelector(".clock-gauge");
+  const width = gauge?.getBoundingClientRect().width || 340;
+  const scaleX = width / 340;
+  const angle = Math.PI * (1 - progress);
+  return {
+    x: (170 + 165 * Math.cos(angle)) * scaleX - 13,
+    y: 180 - 165 * Math.sin(angle) - 13,
+  };
+}
+
+function updateGauge(value) {
+  const fill = document.getElementById("arcDial");
+  const dot = document.getElementById("gaugeDot");
+  if (!fill || !dot) return;
+  const progress = Math.min(1, Math.max(0, Number(value) || 0));
+  const position = gaugePosition(progress);
+  const clipPath = `inset(0 ${100 - progress * 100}% 0 0)`;
+
+  if (reducedMotion) {
+    fill.style.clipPath = clipPath;
+    dot.style.transform = `translate3d(${position.x}px, ${position.y}px, 0)`;
+    return;
+  }
+
+  play(fill, { clipPath, duration: 920, ease: "linear" });
+  play(dot, { x: position.x, y: position.y, duration: 920, ease: "linear" });
+}
+
 function showLocalToast(message) {
   const toast = document.getElementById("toast");
   if (!toast) return;
@@ -103,16 +132,25 @@ const menus = {
   biwon: ["비원 메뉴", "오늘의 추천 메뉴<br>신선한 샐러드<br>수프와 곁들임<br>디저트"],
 };
 
+const instagramLinks = {
+  cafeteria: "https://www.instagram.com/jikdang_seongsu/",
+  special: "https://www.instagram.com/jikdang_seongsu/",
+  bombom: "https://www.instagram.com/bombom_seongsu/",
+  biwon: "https://www.instagram.com/b1kitchen/",
+};
+
 function setupLunchChips() {
   const chips = document.querySelectorAll("[data-menu]");
   const title = document.getElementById("menuTitle");
   const text = document.getElementById("menuText");
+  const link = document.getElementById("lunchLink");
   if (!chips.length || !title || !text) return;
   chips.forEach((chip) => {
     chip.addEventListener("click", () => {
       chips.forEach((item) => item.classList.toggle("selected", item === chip));
       const content = menus[chip.dataset.menu];
       if (!content) return;
+      if (link && instagramLinks[chip.dataset.menu]) link.href = instagramLinks[chip.dataset.menu];
       const card = title.parentElement;
       const update = () => { title.textContent = content[0]; text.innerHTML = content[1]; };
       if (reducedMotion) return update();
@@ -123,9 +161,6 @@ function setupLunchChips() {
       });
     });
   });
-  document.getElementById("lunchLink")?.addEventListener("click", () => {
-    showLocalToast("식당 인스타그램 연결은 다음 업데이트에서 제공할게요.");
-  });
 }
 
 function pad(value) {
@@ -134,6 +169,8 @@ function pad(value) {
 
 function syncControl(input) {
   if (!input) return;
+  const display = input.closest(".display-input");
+  display?.classList.toggle("has-value", Boolean(input.value));
   if (input.type === "time") {
     const [hour = "00", minute = "00"] = (input.value || "00:00").split(":");
     document.querySelectorAll(`[data-time-hour="${input.id}"]`).forEach((node) => { node.textContent = hour; });
@@ -166,16 +203,24 @@ function chooseSegment(container, button) {
 }
 
 function setupVacationSegments() {
-  const periodGroup = document.querySelector(".day-segments");
+  const periodGroup = document.querySelector(".start-period-segments");
   periodGroup?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-period-choice]");
     if (!button) return;
     chooseSegment(periodGroup, button);
     const start = document.getElementById("vacationStartPeriod");
-    const end = document.getElementById("vacationEndPeriod");
     if (start) start.value = button.dataset.periodChoice;
-    if (end) end.value = button.dataset.periodChoice;
     start?.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
+  const endPeriodGroup = document.querySelector(".end-period-segments");
+  endPeriodGroup?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-end-period-choice]");
+    if (!button) return;
+    chooseSegment(endPeriodGroup, button);
+    const end = document.getElementById("vacationEndPeriod");
+    if (end) end.value = button.dataset.endPeriodChoice;
+    end?.dispatchEvent(new Event("change", { bubbles: true }));
   });
 
   const reasonGroup = document.querySelector(".reason-segments");
@@ -185,15 +230,7 @@ function setupVacationSegments() {
     if (!button) return;
     chooseSegment(reasonGroup, button);
     if (nonCharge) nonCharge.checked = true;
-    const radio = document.querySelector(`input[name="vacationType"][value="${button.dataset.specialChoice}"]`);
-    if (radio) { radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true })); }
-  });
-
-  nonCharge?.addEventListener("change", () => {
-    const selected = reasonGroup?.querySelector(".selected")?.dataset.specialChoice || "health";
-    const value = nonCharge.checked ? selected : "full";
-    const radio = document.querySelector(`input[name="vacationType"][value="${value}"]`);
-    if (radio) { radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true })); }
+    nonCharge?.dispatchEvent(new Event("change", { bubbles: true }));
   });
 }
 
@@ -220,7 +257,7 @@ function setupDynamicLists() {
 }
 
 function setupModalMotion() {
-  document.querySelectorAll("#attendanceDialog, #vacationFlowDialog").forEach((backdrop) => {
+  document.querySelectorAll("#attendanceDialog").forEach((backdrop) => {
     const observer = new MutationObserver(() => {
       if (backdrop.hidden) return;
       const panel = backdrop.querySelector(".attendance-dialog, .bottom-sheet:not([hidden])");
@@ -230,6 +267,67 @@ function setupModalMotion() {
     observer.observe(backdrop, { attributes: true, attributeFilter: ["hidden"] });
   });
 }
+
+function toggleVacationTypes(group, show) {
+  if (show) {
+    group.hidden = false;
+    if (!reducedMotion) play(group, { opacity: [0, 1], y: [-8, 0], scale: [0.98, 1], duration: 240, ease: "out(3)" });
+    return;
+  }
+  if (reducedMotion) {
+    group.hidden = true;
+    return;
+  }
+  const animation = play(group, { opacity: [1, 0], y: [0, -8], duration: 150, ease: "in(2)" });
+  animation?.then(() => { group.hidden = true; });
+}
+
+async function setVacationStage(backdrop, nextPanel) {
+  const panels = Array.from(backdrop.querySelectorAll(".bottom-sheet"));
+  const active = panels.find((panel) => !panel.hidden);
+  const opening = backdrop.hidden;
+  backdrop.hidden = false;
+
+  if (active && active !== nextPanel && !reducedMotion) {
+    const out = play(active, { opacity: [1, 0], y: [0, 18], duration: 150, ease: "in(2)" });
+    if (out) await out;
+  }
+  panels.forEach((panel) => { panel.hidden = panel !== nextPanel; });
+
+  if (reducedMotion) return;
+  if (opening) play(backdrop, { opacity: [0, 1], duration: 180, ease: "out(2)" });
+  play(nextPanel, {
+    opacity: [0, 1],
+    y: [36, 0],
+    scale: [0.985, 1],
+    duration: 320,
+    ease: "out(3)",
+  });
+}
+
+async function closeVacationFlow(backdrop, onComplete) {
+  const active = backdrop.querySelector(".bottom-sheet:not([hidden])");
+  if (!reducedMotion) {
+    const animations = [
+      active && play(active, { opacity: [1, 0], y: [0, 34], duration: 190, ease: "in(2)" }),
+      play(backdrop, { opacity: [1, 0], duration: 190, ease: "in(2)" }),
+    ].filter(Boolean);
+    await Promise.all(animations);
+  }
+  onComplete();
+  backdrop.style.opacity = "";
+  if (active) {
+    active.style.opacity = "";
+    active.style.transform = "";
+  }
+}
+
+window.AlarmmMotion = Object.assign(window.AlarmmMotion || {}, {
+  closeVacationFlow,
+  setVacationStage,
+  toggleVacationTypes,
+  updateGauge,
+});
 
 pageEntrance();
 setupScrollReveals();

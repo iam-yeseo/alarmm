@@ -14,21 +14,53 @@ python3 -m http.server 4173
 
 ## 구성
 
-- `index.html`: 실시간 시계, 오늘 현황, 퇴근길 버스, 점심 메뉴
+- `index.html`: 실시간 시계·진행 게이지, 오늘 현황, 출퇴근길 실시간 버스, 점심 메뉴
 - `calendar.html`: 월간 출근 달력, 누적 근무시간과 월별 기록
-- `vacation.html`: 날짜 범위형 연차·월차, 반차·반반차·비차감 휴가 신청 내역
+- `vacation.html`: 날짜·시간 범위형 연차, 반차·반반차·시간차·비차감 휴가 신청 내역
 - `settings.html`: 입사일, 근무·점심 시간과 휴가 정책 설정
 - `styles.css`, `styles-v2.css`: Figma 기반 반응형 440px 모바일 캔버스와 화면별 스타일
 - `app.js`: 시간 계산, 설정 저장, 근무기록과 휴가 신청 로직
 - `motion.js`: Anime.js v4 기반 진입, 스크롤, 버튼, 세그먼트, 패널 모션
 - `vacation-core.js`: 입사일 기준 휴가 발생·소멸·차감 계산
+- `functions/api/bus-arrivals.js`: Cloudflare Pages Function 기반 서울시 버스 API 프록시
+- `bus-api-core.mjs`: 정류소 설정 검증과 서울시 버스 XML 응답 변환
 - `assets/figma/`: 현재 Figma 파일에서 내려받은 원본 SVG 리소스
 
 설정, 근무기록과 휴가 신청은 브라우저 `localStorage`에 저장됩니다. 생일을 설정하면 해당 날짜의 오후 반차 일정이 자동 반영됩니다.
+
+## 실시간 버스 API
+
+Cloudflare Pages 프로젝트의 **Settings → Variables and Secrets**에서 아래 암호화 변수를 등록하세요.
+
+- `SEOUL_BUS_API_KEY` (필수): 공공데이터포털에서 발급받은 서울특별시 버스운행정보 공유서비스 일반 인증키
+- `BUS_COMMUTE_STOPS_JSON` (선택): 출근길 정류소·노선 재정의
+- `BUS_HOME_STOPS_JSON` (선택): 퇴근길 정류소·노선 재정의
+
+정류소 변수는 다음 형태의 JSON 배열입니다. 최대 5개 정류소, 정류소별 최대 10개 노선을 조회합니다.
+
+```json
+[
+  {
+    "arsId": "04540",
+    "direction": "성수SKV1센터1동 방면",
+    "routes": ["성동10"]
+  }
+]
+```
+
+기본값은 Figma에 표시된 출근길 `04540 / 성동10`, 퇴근길 `04210 / 302·2012·2222`입니다. 브라우저는 `/api/bus-arrivals`만 호출하므로 API 키가 클라이언트 코드에 노출되지 않습니다. API는 30초마다 다시 동기화하고, 화면의 분·초 카운트다운은 매초 갱신합니다.
+
+Cloudflare 로컬 실행:
+
+```bash
+npx wrangler pages dev .
+```
 
 ## 검사
 
 ```bash
 node --check app.js
 node tests/vacation-core.test.js
+node tests/bus-api-core.test.mjs
+node tests/bus-api-function.test.mjs
 ```
