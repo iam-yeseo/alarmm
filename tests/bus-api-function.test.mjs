@@ -20,8 +20,11 @@ try {
     const url = new URL(String(input));
     assert.equal(url.protocol, "http:");
     assert.equal(url.hostname, "ws.bus.go.kr");
+    assert.equal(url.pathname, "/api/rest/arrive/getArrInfoByRoute");
     assert.equal(url.searchParams.get("serviceKey"), "encoded+key");
-    assert.equal(url.searchParams.get("arsId"), "04540");
+    assert.equal(url.searchParams.get("stId"), "103900298");
+    assert.equal(url.searchParams.get("busRouteId"), "103900008");
+    assert.equal(url.searchParams.get("ord"), "19");
     return new Response(`<?xml version="1.0" encoding="UTF-8"?>
       <ServiceResult>
         <msgHeader><headerCd>0</headerCd><headerMsg>정상 처리되었습니다.</headerMsg></msgHeader>
@@ -47,6 +50,38 @@ try {
   assert.equal(body.arrivals[0].routeName, "성동10");
   assert.equal(body.arrivals[0].firstSeconds, 130);
   assert.equal(body.arrivals[0].secondSeconds, 425);
+
+  const homeTargets = new Map([
+    ["100100052", { routeName: "302", ord: "75", routeType: "3", firstSeconds: 150 }],
+    ["100100186", { routeName: "2012", ord: "71", routeType: "4", firstSeconds: 95 }],
+    ["100100199", { routeName: "2222", ord: "49", routeType: "4", firstSeconds: 210 }],
+  ]);
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    const target = homeTargets.get(url.searchParams.get("busRouteId"));
+    assert.ok(target, "퇴근길에 지정된 세 노선만 조회한다");
+    assert.equal(url.pathname, "/api/rest/arrive/getArrInfoByRoute");
+    assert.equal(url.searchParams.get("stId"), "103000111");
+    assert.equal(url.searchParams.get("ord"), target.ord);
+    return new Response(`<?xml version="1.0"?><ServiceResult>
+      <msgHeader><headerCd>0</headerCd><headerMsg>정상 처리되었습니다.</headerMsg></msgHeader>
+      <msgBody><itemList>
+        <arsId>04210</arsId><stId>103000111</stId><stNm>성수2가3동주민센터</stNm>
+        <rtNm>${target.routeName}</rtNm><routeType>${target.routeType}</routeType>
+        <arrmsg1>${target.firstSeconds}초 후</arrmsg1><traTime1>${target.firstSeconds}</traTime1>
+        <arrmsg2>다음 도착 정보 없음</arrmsg2>
+      </itemList></msgBody>
+    </ServiceResult>`, { status: 200, headers: { "Content-Type": "application/xml" } });
+  };
+  const homeResponse = await onRequestGet({
+    request: new Request("https://alarmm.example/api/bus-arrivals?mode=home"),
+    env: { SEOUL_BUS_API_KEY: "encoded%2Bkey" },
+  });
+  const homeBody = await homeResponse.json();
+  assert.equal(homeResponse.status, 200);
+  assert.deepEqual(homeBody.arrivals.map((arrival) => arrival.routeName), ["302", "2012", "2222"]);
+  assert.deepEqual(homeBody.arrivals.map((arrival) => arrival.firstSeconds), [150, 95, 210]);
+  assert.deepEqual(homeBody.arrivals.map((arrival) => arrival.routeType), ["3", "4", "4"]);
 
   const originalConsoleError = console.error;
   console.error = () => {};
@@ -75,4 +110,4 @@ try {
   globalThis.fetch = originalFetch;
 }
 
-console.log("bus-api-function: 17 assertions passed");
+console.log("bus-api-function: passed");

@@ -126,6 +126,38 @@ export function parseBusXml(xml, stop) {
   });
 }
 
+export function parseRouteArrivalXml(xml, target) {
+  const headerCode = readXmlTag(xml, "headerCd") || readXmlTag(xml, "returnReasonCode") || readXmlTag(xml, "resultCode");
+  const headerMessage = readXmlTag(xml, "headerMsg") || readXmlTag(xml, "returnAuthMsg") || readXmlTag(xml, "resultMsg") || readXmlTag(xml, "errMsg");
+  if (headerCode && headerCode !== "0" && headerCode !== "00") {
+    const error = new Error(headerMessage || "서울시 버스 API 요청에 실패했습니다.");
+    error.code = `SEOUL_BUS_${headerCode}`;
+    throw error;
+  }
+
+  const block = String(xml || "").match(/<itemList>[\s\S]*?<\/itemList>/i)?.[0];
+  if (!block) return [];
+
+  const firstMessage = readXmlTag(block, "arrmsg1");
+  const secondMessage = readXmlTag(block, "arrmsg2");
+  const routeName = readXmlTag(block, "rtNm") || target.routeName;
+  const stationName = readXmlTag(block, "stNm") || target.stationName;
+  const apiDirection = readXmlTag(block, "dir");
+
+  return [{
+    id: `${target.arsId}-${routeName}`,
+    arsId: target.arsId,
+    stationName,
+    routeName,
+    routeType: readXmlTag(block, "routeType") || target.routeType,
+    direction: target.direction || (apiDirection ? `${apiDirection} 방면` : stationName),
+    firstMessage,
+    secondMessage,
+    firstSeconds: parseArrivalSeconds(readXmlTag(block, "traTime1"), firstMessage),
+    secondSeconds: parseArrivalSeconds(readXmlTag(block, "traTime2"), secondMessage),
+  }];
+}
+
 export function completeRouteArrivals(stops, arrivals) {
   const byStopAndRoute = new Map(
     (Array.isArray(arrivals) ? arrivals : []).map((arrival) => [
